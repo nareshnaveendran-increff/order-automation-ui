@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import json
 import time
+import os
 from datetime import datetime, timedelta
 
 # --- Page Configuration ---
@@ -11,14 +12,34 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- Strict Visibility Styling ---
+# --- 1. HORIZONTAL LOGO ALIGNMENT ---
+with st.sidebar:
+    current_dir = os.path.dirname(__file__)
+    
+    # Create two columns in the sidebar for Side-by-Side alignment
+    side_col1, side_col2 = st.columns(2)
+    
+    # Logo 1 - Left Side (Small Size)
+    path1 = os.path.join(current_dir, "logo.png") 
+    if os.path.exists(path1):
+        # width=80 to keep it roughly half the size of the sidebar column
+        side_col1.image(path1, width=240) 
+    else:
+        side_col1.error("logo1 missing")
+
+    # Logo 2 - Right Side (Full Column Width)
+    path2 = os.path.join(current_dir, "logo2.png")
+    if os.path.exists(path2):
+        side_col2.image(path2, use_container_width=True)
+    else:
+        side_col2.error("logo2 missing")
+
+# --- 2. SUPER COOL UI STYLING ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-    
     [data-testid="stAppViewContainer"] { background-color: #fcfafb; font-family: 'Inter', sans-serif; }
     
-    /* Header Visibility */
     h1, h2, h3, .stMarkdown p, label { 
         color: #a31d1d !important; 
         font-weight: 700 !important; 
@@ -37,18 +58,14 @@ st.markdown("""
         box-shadow: 0 4px 20px rgba(0,0,0,0.03); margin-bottom: 30px;
     }
 
-    /* Input Fields */
     .stTextInput>div>div>input {
-        background-color: #ffffff !important; 
-        color: #000000 !important;
-        border: 2px solid #d32f2f !important; 
-        border-radius: 10px;
+        background-color: #ffffff !important; color: #000000 !important;
+        border: 2px solid #d32f2f !important; border-radius: 10px;
     }
 
-    /* Metric Display */
-    [data-testid="stMetricValue"] { font-weight: 900; color: #d32f2f !important; font-size: 8rem !important; }
+    [data-testid="stMetricValue"] { font-weight: 900; color: #d32f2f !important; font-size: 8rem !important; letter-spacing: -2px; }
 
-    /* RED BUTTON VISIBILITY FIX */
+    /* Buttons Visibility and Styling */
     .stButton > button {
         background-color: #d32f2f !important;
         color: white !important;
@@ -57,27 +74,12 @@ st.markdown("""
         width: 100% !important;
         font-weight: 800 !important;
         font-size: 1.1rem !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        display: block !important;
         border: none !important;
-        box-shadow: 0 4px 10px rgba(211, 47, 47, 0.3) !important;
+        display: block !important;
     }
     
-    .stButton > button:hover {
-        background-color: #b71c1c !important;
-        transform: translateY(-2px);
-    }
-
-    /* Grey Style for Pack Existing */
-    .secondary-btn div[data-testid="stButton"] > button {
-        background-color: #757575 !important;
-    }
-
-    /* Dark Style for Cancellation */
-    .cancel-btn div[data-testid="stButton"] > button {
-        background-color: #333333 !important;
-    }
+    .secondary-btn div[data-testid="stButton"] > button { background-color: #757575 !important; }
+    .cancel-btn div[data-testid="stButton"] > button { background-color: #333333 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -116,7 +118,7 @@ def celebration_js():
 
 st.markdown('<div class="main-header"><h1>⚡ INCREFF USP AUTOMATION</h1></div>', unsafe_allow_html=True)
 
-# 1. INVENTORY SEARCH
+# 1. Inventory search
 with st.container():
     st.markdown('<div class="step-card">', unsafe_allow_html=True)
     st.subheader("🏬 1. Inventory search")
@@ -143,7 +145,7 @@ with st.container():
             cols[i].metric(label=f"📦 SKU STOCK: {item.get('channelSkuCode')}", value=item.get("qcPassAvailableQuantity", 0))
     st.markdown('</div>', unsafe_allow_html=True)
 
-# 2. CREATE OUTWARD ORDER
+# 2. Create Outward Order
 if st.session_state.phase in ['create', 'pack']:
     with st.container():
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
@@ -155,10 +157,10 @@ if st.session_state.phase in ['create', 'pack']:
             else:
                 st.session_state.order_success_time = 0
 
-        c1, c2 = st.columns(2)
-        with c1:
+        c1_in, col_ord = st.columns(2)
+        with c1_in:
             sku_qty_map = st.text_input("Order Map (SKU:Qty):", placeholder="04511240203432:5")
-        with c2:
+        with col_ord:
             order_code = st.text_input("Unique Order ID:", placeholder="NEGHC-XXXX")
 
         if st.button("🛒 CREATE OUTWARD ORDER", key="create_btn"):
@@ -191,12 +193,11 @@ if st.session_state.phase in ['create', 'pack']:
             except Exception as e: st.error(f"Error: {str(e)}")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# 3. ORDER PROCESSING
+# 3. Order Processing
 if st.session_state.phase == 'pack':
     with st.container():
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         st.subheader("⚙️ 3. Order Processing")
-        
         if st.button("📦 Pack and dispatch", key="dispatch_btn", disabled=st.session_state.dispatch_done):
             headers = {'authUsername': CREDS["PACK_DISPATCH"]["user"], 'authPassword': CREDS["PACK_DISPATCH"]["pass"], 'Content-Type': 'application/json'}
             pack_payload = {"orderCode": st.session_state.order_id, "locationCode": "1992", "channelName": "NOON", "shipmentItems": [{"channelSkuCode": k, "quantityToPack": str(v)} for k, v in st.session_state.sku_map.items()]}
@@ -223,7 +224,6 @@ with st.container():
         if st.button("📋 Pack the existing order", key="pack_existing"):
             st.warning("Under construction 👷")
         st.markdown('</div>', unsafe_allow_html=True)
-        
     with bot_col2:
         st.markdown('<div class="cancel-btn">', unsafe_allow_html=True)
         if st.button("🛑 Customer Cancellation", key="cancel_order"):
