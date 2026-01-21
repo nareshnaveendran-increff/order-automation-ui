@@ -41,9 +41,10 @@ st.markdown("""
     .step-card { background: #ffffff; padding: 25px; border-radius: 15px; border: 1px solid #eef0f2; box-shadow: 0 2px 10px rgba(0,0,0,0.03); margin-bottom: 15px; }
     .stButton > button { background-color: #d32f2f !important; color: white !important; border-radius: 8px !important; font-weight: 700 !important; height: 3em !important; width: 100%; }
     .download-link {
-        display: inline-block; padding: 0.4em 0.8em; color: #d32f2f !important; text-decoration: none;
-        border: 1px solid #d32f2f; border-radius: 8px; font-weight: 600; text-align: center; margin-top: 5px; width: 100%; font-size: 0.9rem;
+        display: block; padding: 12px; color: white !important; text-decoration: none;
+        background-color: #2e7d32; border-radius: 8px; font-weight: 700; text-align: center; margin-top: 10px; font-size: 1rem;
     }
+    .download-link:hover { background-color: #1b5e20; text-decoration: none; color: #ffffff !important; }
     .stTextInput > div > div > input { height: 45px !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -87,6 +88,8 @@ URLS = {
 if 'inv_res' not in st.session_state: st.session_state.inv_res = []
 if 'order_id' not in st.session_state: st.session_state.order_id = ""
 if 'f_sku_map' not in st.session_state: st.session_state.f_sku_map = {}
+if 'inv_url' not in st.session_state: st.session_state.inv_url = None
+if 'lab_url' not in st.session_state: st.session_state.lab_url = None
 
 # --- 7. Tabs ---
 t1, t2, t3, t4, t5 = st.tabs(["📊 Inventory management", "🚀 Order Fulfilment", "📦 Order Manager", "🛑 Order Cancellation", "🔄 Returns"])
@@ -94,7 +97,7 @@ t1, t2, t3, t4, t5 = st.tabs(["📊 Inventory management", "🚀 Order Fulfilmen
 # --- TAB 1: INVENTORY MANAGEMENT ---
 with t1:
     st.markdown('<div class="step-card">', unsafe_allow_html=True)
-    st.subheader("🔍 Check Live Inventory")
+    st.subheader("🔍 Check Live Stock")
     s_col1, s_col2 = st.columns([4, 1])
     with s_col1:
         search_skus = st.text_input("Enter SKU Codes (comma separated)", placeholder="SKU1, SKU2", key="inv_search_input", label_visibility="collapsed")
@@ -111,6 +114,7 @@ with t1:
                         st.error("🚨 502 Server Error: Staging server unavailable. Try again in 30 seconds.")
                     else: st.error(f"Failed: {res.text}")
                 except Exception as e: st.error(f"Error: {str(e)}")
+    
     if st.session_state.inv_res:
         st.write("##")
         cols = st.columns(len(st.session_state.inv_res))
@@ -120,7 +124,7 @@ with t1:
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="step-card">', unsafe_allow_html=True)
-    st.subheader("🆙 Update Inventory")
+    st.subheader("🆙 Update Absolute Inventory")
     u_col1, u_col2, u_col3 = st.columns([2, 1, 1])
     with u_col1:
         single_up_sku = st.text_input("Channel SKU Code", placeholder="e.g. LEVI_001", key="up_sku_input")
@@ -130,7 +134,6 @@ with t1:
         st.write("##")
         update_clicked = st.button("Update Inventory", key="btn_up_inv")
     
-    toast_placeholder = st.empty()
     if update_clicked:
         if single_up_sku and single_up_qty:
             try:
@@ -138,11 +141,9 @@ with t1:
                 up_payload = {"locationCode": "1992", "products": [{"channelSkuCode": single_up_sku, "quantity": single_up_qty}]}
                 res = requests.put(URLS["UPDATE"], headers=headers, json=up_payload)
                 if res.status_code == 200:
-                    toast_placeholder.success(f"Success! {single_up_sku} updated.")
-                    time.sleep(3)
-                    toast_placeholder.empty()
+                    st.success(f"Success! {single_up_sku} updated.")
                 elif res.status_code == 502:
-                    st.error("🚨 502 Server Error: Staging server unavailable. Try again in 30 seconds.")
+                    st.error("🚨 502 Server Error: Staging server unavailable.")
                 else: st.error(f"Update Failed: {res.text}")
             except Exception as e: st.error(f"Error: {str(e)}")
     st.markdown('</div>', unsafe_allow_html=True)
@@ -180,32 +181,54 @@ with t2:
                     st.session_state.f_sku_map = sku_map
                     st.success(f"Order {order_id_input} Created Successfully")
                 elif res.status_code == 502:
-                    st.error("🚨 502 Server Error: Staging server unavailable. Try again in 30 seconds.")
+                    st.error("🚨 502 Server Error: Staging server unavailable.")
                 else: st.error(f"Failed: {res.text}")
         except Exception as e: st.error(str(e))
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="step-card">', unsafe_allow_html=True)
-    st.subheader("📦 Pack & Dispatch")
+    st.subheader("📦 Pack & Dispatch Process")
     if not st.session_state.order_id:
         st.warning("⚠️ Action Required: Please create an order first to unlock the Packing and Handover Process")
     else:
         st.info(f"✅ Active Order Ready: {st.session_state.order_id}")
         if st.button("📦 Execute Pack & Dispatch"):
-            headers = {'authUsername': CREDS["PACK_DISPATCH"]["user"], 'authPassword': CREDS["PACK_DISPATCH"]["pass"], 'Content-Type': 'application/json'}
-            p_payload = {"orderCode": st.session_state.order_id, "locationCode": "1992", "channelName": "NOON", "shipmentItems": [{"channelSkuCode": k, "quantityToPack": str(v)} for k, v in st.session_state.f_sku_map.items()]}
-            p_res = requests.post(URLS["PACK"], headers=headers, json=p_payload)
-            if p_res.status_code == 200:
-                p_data = p_res.json()
-                st.session_state.inv_u = p_data.get('invoiceUrl')
-                st.session_state.lab_u = p_data.get('shippingLabelUrl')
-                requests.post(URLS["HANDOVER"], headers=headers, json={"channelName": "NOON", "locationCode": "1992", "orderCodes": [st.session_state.order_id], "transporter": "SELF"})
-                st.balloons(); st.success("Fulfillment Cycle Completed")
+            with st.spinner("Processing Packing and Handover..."):
+                try:
+                    headers = {'authUsername': CREDS["PACK_DISPATCH"]["user"], 'authPassword': CREDS["PACK_DISPATCH"]["pass"], 'Content-Type': 'application/json'}
+                    p_payload = {
+                        "orderCode": st.session_state.order_id, 
+                        "locationCode": "1992", 
+                        "channelName": "NOON", 
+                        "shipmentItems": [{"channelSkuCode": k, "quantityToPack": str(v)} for k, v in st.session_state.f_sku_map.items()]
+                    }
+                    p_res = requests.post(URLS["PACK"], headers=headers, json=p_payload)
+                    
+                    if p_res.status_code == 200:
+                        data = p_res.json()
+                        # EXTRACTION FIX: Mapping the nested shipping label URL correctly
+                        st.session_state.inv_url = data.get("invoiceUrl")
+                        st.session_state.lab_url = data.get("shippingLabel", {}).get("shippingLabelUrl")
+                        
+                        # Trigger Handover
+                        requests.post(URLS["HANDOVER"], headers=headers, json={"channelName": "NOON", "locationCode": "1992", "orderCodes": [st.session_state.order_id], "transporter": "SELF"})
+                        st.balloons()
+                        st.success("Pack & Handover Successful!")
+                    else:
+                        st.error(f"Packing Failed: {p_res.text}")
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
         
-        if 'inv_u' in st.session_state and st.session_state.inv_u:
-            c1, c2 = st.columns(2)
-            c1.markdown(f'<a href="{st.session_state.inv_u}" target="_blank" class="download-link">📄 Download Invoice</a>', unsafe_allow_html=True)
-            c2.markdown(f'<a href="{st.session_state.lab_u}" target="_blank" class="download-link">🏷️ Download Label</a>', unsafe_allow_html=True)
+        # Display Download Buttons
+        if st.session_state.inv_url or st.session_state.lab_url:
+            st.divider()
+            st.subheader("📄 Download Documents")
+            d_col1, d_col2 = st.columns(2)
+            if st.session_state.inv_url:
+                d_col1.markdown(f'<a href="{st.session_state.inv_url}" target="_blank" class="download-link">📥 Download Invoice</a>', unsafe_allow_html=True)
+            if st.session_state.lab_url:
+                d_col2.markdown(f'<a href="{st.session_state.lab_url}" target="_blank" class="download-link">📥 Download Shipping Label</a>', unsafe_allow_html=True)
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 3: ORDER MANAGER ---
@@ -232,10 +255,10 @@ with t3:
             else: st.warning("No entries found.")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 4: CANCELLATION ---
+# --- TAB 4: ORDER CANCELLATION ---
 with t4:
     st.markdown('<div class="step-card">', unsafe_allow_html=True)
-    st.subheader("🛑 Cancellation Request")
+    st.subheader("🛑 Order Cancellation Request")
     cancel_type = st.radio("Cancellation Reason", ["Seller Cancellation", "Customer Cancellation"], horizontal=True)
     col_oid, col_sku, col_qty = st.columns(3)
     if cancel_type == "Customer Cancellation":
@@ -260,7 +283,7 @@ with t4:
                     payload = {"orderCode": oid_val, "locationCode": "1992", "channelName": "NOON", "orderItems": [{"channelSkuCode": sku_val, "cancelledQuantity": str(qty_val)}]}
                 res = requests.put(url, headers=headers, json=payload)
                 if res.status_code in [200, 204]: st.success(f"Success! {cancel_type} processed for {oid_val}")
-                elif res.status_code == 502: st.error("🚨 502 Server Error: Staging server unavailable. Try again in 30 seconds.")
+                elif res.status_code == 502: st.error("🚨 502 Server Error: Staging server unavailable.")
                 else: st.error(f"Failed: {res.text}")
             except Exception as e: st.error(f"Error: {str(e)}")
         else: st.warning("Please fill all fields.")
@@ -269,14 +292,12 @@ with t4:
 # --- TAB 5: RETURNS ---
 with t5:
     ret_t1, ret_t2 = st.tabs(["Create Return", "Return Processing"])
-    
     with ret_t1:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
-        st.subheader("➕ Create Return")
+        st.subheader("➕ Create Return Request")
         st.text_input("Order ID", key="ret_create_oid")
         st.button("Generate Request", key="btn_ret_create")
         st.markdown('</div>', unsafe_allow_html=True)
-        
     with ret_t2:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         st.subheader("🔄 Process Received Return")
