@@ -4,6 +4,7 @@ import json
 import time
 import os
 import base64
+import pandas as pd
 from datetime import datetime, timedelta
 
 # --- 1. Page Configuration ---
@@ -32,23 +33,18 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
     [data-testid="stAppViewContainer"] { background-color: #fcfafb; font-family: 'Inter', sans-serif; }
-    .block-container { padding-top: 5rem !important; padding-bottom: 1rem !important; }
-
+    .block-container { padding-top: 6rem !important; padding-bottom: 1rem !important; }
     .header-wrapper { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 20px; }
     .super-header { color: #d32f2f !important; font-size: 3rem !important; font-weight: 800 !important; letter-spacing: -1.8px; margin: 0; text-align: center; flex-grow: 1; }
-
     .stock-card { background: #fff; border: 2px solid #d32f2f; border-radius: 10px; padding: 10px; text-align: center; box-shadow: 0 2px 8px rgba(211, 47, 47, 0.05); }
     .stock-value { font-size: 2.8rem; color: #d32f2f; font-weight: 900; line-height: 1; margin: 5px 0; }
-    .stock-sku { font-size: 0.75rem; color: #888; }
-
-    .step-card { background: #ffffff; padding: 15px 25px; border-radius: 12px; border: 1px solid #eef0f2; box-shadow: 0 2px 10px rgba(0,0,0,0.03); margin-bottom: 8px; }
-    
+    .step-card { background: #ffffff; padding: 25px; border-radius: 15px; border: 1px solid #eef0f2; box-shadow: 0 2px 10px rgba(0,0,0,0.03); margin-bottom: 15px; }
     .stButton > button { background-color: #d32f2f !important; color: white !important; border-radius: 8px !important; font-weight: 700 !important; height: 3em !important; width: 100%; }
-    
     .download-link {
         display: inline-block; padding: 0.4em 0.8em; color: #d32f2f !important; text-decoration: none;
         border: 1px solid #d32f2f; border-radius: 8px; font-weight: 600; text-align: center; margin-top: 5px; width: 100%; font-size: 0.9rem;
     }
+    .stTextInput > div > div > input { height: 45px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -70,7 +66,10 @@ CREDS = {
     "SEARCH_INV": {"user": "NOON-1200063685", "pass": "73722c6c-c716-489c-88b8-5347132f5745"},
     "UPDATE_INV": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"},
     "CREATE_ORDER": {"user": "NOON-1200063685", "pass": "73722c6c-c716-489c-88b8-5347132f5745"},
-    "PACK_DISPATCH": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"}
+    "PACK_DISPATCH": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"},
+    "SUB_ORDER_SEARCH": {"user": "testing", "pass": "OqdR#Dv613", "domain": "staging1-omni", "client": "1200063685"},
+    "CANCEL_ORDER_CUST": {"user": "NOON-1200063685", "pass": "73722c6c-c716-489c-88b8-5347132f5745"},
+    "CANCEL_ORDER_SELLER": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"}
 }
 
 URLS = {
@@ -78,69 +77,85 @@ URLS = {
     "UPDATE": "https://staging-common-assure.increff.com/assure-magic2/usp/inventories/absolute",
     "CREATE": "https://staging-common.omni.increff.com/assure-magic2/orders/outward",
     "PACK": "https://staging-common-assure.increff.com/assure-magic2/usp/order/pack",
-    "HANDOVER": "https://staging-common-assure.increff.com/assure-magic2/ewms/push/usp/handover/combined"
+    "HANDOVER": "https://staging-common-assure.increff.com/assure-magic2/ewms/push/usp/handover/combined",
+    "SUB_ORDER_SEARCH": "https://staging1.omni.increff.com/oms/orders/outward/sub-orders/search",
+    "CANCEL_CUST_BASE": "https://staging-common.omni.increff.com/assure-magic2/orders",
+    "CANCEL_SELLER": "https://staging-common-assure.increff.com/assure-magic2/usp/order/cancel"
 }
 
 # --- 6. Session State ---
 if 'inv_res' not in st.session_state: st.session_state.inv_res = []
 if 'order_id' not in st.session_state: st.session_state.order_id = ""
+if 'f_sku_map' not in st.session_state: st.session_state.f_sku_map = {}
 
 # --- 7. Tabs ---
 t1, t2, t3, t4, t5 = st.tabs(["📊 Inventory management", "🚀 Order Fulfilment", "📦 Order Manager", "🛑 Order Cancellation", "🔄 Returns"])
 
 # --- TAB 1: INVENTORY MANAGEMENT ---
 with t1:
-    # --- Check Inventory ---
     st.markdown('<div class="step-card">', unsafe_allow_html=True)
-    st.subheader("Inventory Check")
-    s_col_in, s_col_btn = st.columns([4, 1.2])
-    search_skus = s_col_in.text_input("Enter SKU Codes", placeholder="SKU1, SKU2", key="live_search", label_visibility="collapsed")
-    if s_col_btn.button("🔍 Check Stock"):
-        sku_list = [s.strip() for s in search_skus.split(",") if s.strip()]
-        if sku_list:
-            headers = {'authUsername': CREDS["SEARCH_INV"]["user"], 'authPassword': CREDS["SEARCH_INV"]["pass"], 'Content-Type': 'application/json'}
-            res = requests.post(URLS["SEARCH"], headers=headers, json={"locationCode": "WHBGN21", "channelSkuCodes": sku_list})
-            if res.status_code == 200: st.session_state.inv_res = res.json().get("inventories", [])
-    
+    st.subheader("🔍 Check Live Inventory")
+    s_col1, s_col2 = st.columns([4, 1])
+    with s_col1:
+        search_skus = st.text_input("Enter SKU Codes (comma separated)", placeholder="SKU1, SKU2", key="inv_search_input", label_visibility="collapsed")
+    with s_col2:
+        if st.button("Check Stock", key="btn_check_inv"):
+            sku_list = [s.strip() for s in search_skus.split(",") if s.strip()]
+            if sku_list:
+                try:
+                    headers = {'authUsername': CREDS["SEARCH_INV"]["user"], 'authPassword': CREDS["SEARCH_INV"]["pass"], 'Content-Type': 'application/json'}
+                    res = requests.post(URLS["SEARCH"], headers=headers, json={"locationCode": "WHBGN21", "channelSkuCodes": sku_list})
+                    if res.status_code == 200: 
+                        st.session_state.inv_res = res.json().get("inventories", [])
+                    elif res.status_code == 502:
+                        st.error("🚨 502 Server Error: Staging server unavailable. Try again in 30 seconds.")
+                    else: st.error(f"Failed: {res.text}")
+                except Exception as e: st.error(f"Error: {str(e)}")
     if st.session_state.inv_res:
+        st.write("##")
         cols = st.columns(len(st.session_state.inv_res))
         for idx, item in enumerate(st.session_state.inv_res):
             with cols[idx]:
                 st.markdown(f'<div class="stock-card"><div class="stock-label">Stock</div><div class="stock-value">{item.get("qcPassAvailableQuantity", 0)}</div><div class="stock-sku">{item.get("channelSkuCode")}</div></div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- Update Inventory (Single Input) ---
     st.markdown('<div class="step-card">', unsafe_allow_html=True)
-    st.subheader("Update Inventory")
-    u_col1, u_col2 = st.columns(2)
-    single_up_sku = u_col1.text_input("Channel SKU Code", key="single_up_sku")
-    single_up_qty = u_col2.text_input("Quantity", key="single_up_qty")
+    st.subheader("🆙 Update Inventory")
+    u_col1, u_col2, u_col3 = st.columns([2, 1, 1])
+    with u_col1:
+        single_up_sku = st.text_input("Channel SKU Code", placeholder="e.g. LEVI_001", key="up_sku_input")
+    with u_col2:
+        single_up_qty = st.text_input("Quantity", placeholder="100", key="up_qty_input")
+    with u_col3:
+        st.write("##")
+        update_clicked = st.button("Update Inventory", key="btn_up_inv")
     
-    if st.button("🆙 UPDATE"):
+    toast_placeholder = st.empty()
+    if update_clicked:
         if single_up_sku and single_up_qty:
-            headers = {'authUsername': CREDS["UPDATE_INV"]["user"], 'authPassword': CREDS["UPDATE_INV"]["pass"], 'Content-Type': 'application/json'}
-            up_payload = {
-                "locationCode": "1992",
-                "products": [{"channelSkuCode": single_up_sku, "quantity": single_up_qty}]
-            }
-            res = requests.put(URLS["UPDATE"], headers=headers, json=up_payload)
-            if res.status_code == 200:
-                st.success(f"Successfully updated {single_up_sku} to {single_up_qty}")
-            else:
-                st.error(f"Update Failed: {res.text}")
-        else:
-            st.warning("Please provide both SKU and Quantity.")
+            try:
+                headers = {'authUsername': CREDS["UPDATE_INV"]["user"], 'authPassword': CREDS["UPDATE_INV"]["pass"], 'Content-Type': 'application/json'}
+                up_payload = {"locationCode": "1992", "products": [{"channelSkuCode": single_up_sku, "quantity": single_up_qty}]}
+                res = requests.put(URLS["UPDATE"], headers=headers, json=up_payload)
+                if res.status_code == 200:
+                    toast_placeholder.success(f"Success! {single_up_sku} updated.")
+                    time.sleep(3)
+                    toast_placeholder.empty()
+                elif res.status_code == 502:
+                    st.error("🚨 502 Server Error: Staging server unavailable. Try again in 30 seconds.")
+                else: st.error(f"Update Failed: {res.text}")
+            except Exception as e: st.error(f"Error: {str(e)}")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 2: ORDER FULFILMENT ---
 with t2:
     st.markdown('<div class="step-card">', unsafe_allow_html=True)
-    st.subheader("Create Order")
+    st.subheader("🛒 Create New Order")
     f_col1, f_col2 = st.columns(2)
-    sku_qty_input = f_col1.text_input("Mapping (SKU:Qty)", placeholder="0451...:5", key="f_map")
+    sku_qty_input = f_col1.text_input("Mapping (SKU:Qty)", placeholder="SKU:5", key="f_map")
     order_id_input = f_col2.text_input("Order ID", key="f_id")
     
-    if st.button("🛒 Create Order"):
+    if st.button("🛒 Generate Order"):
         try:
             mapping = [item.strip() for item in sku_qty_input.split(",") if ":" in item]
             sku_map = {p.split(":")[0].strip(): int(p.split(":")[1].strip()) for p in mapping}
@@ -163,14 +178,19 @@ with t2:
                 if res.status_code in [200, 201]:
                     st.session_state.order_id = order_id_input
                     st.session_state.f_sku_map = sku_map
-                    st.success(f"Order {order_id_input} Created")
+                    st.success(f"Order {order_id_input} Created Successfully")
+                elif res.status_code == 502:
+                    st.error("🚨 502 Server Error: Staging server unavailable. Try again in 30 seconds.")
                 else: st.error(f"Failed: {res.text}")
         except Exception as e: st.error(str(e))
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="step-card">', unsafe_allow_html=True)
-    st.subheader("Pack & Handover")
-    if st.session_state.order_id:
+    st.subheader("📦 Pack & Dispatch")
+    if not st.session_state.order_id:
+        st.warning("⚠️ Action Required: Please create an order first to unlock the Packing and Handover Process")
+    else:
+        st.info(f"✅ Active Order Ready: {st.session_state.order_id}")
         if st.button("📦 Execute Pack & Dispatch"):
             headers = {'authUsername': CREDS["PACK_DISPATCH"]["user"], 'authPassword': CREDS["PACK_DISPATCH"]["pass"], 'Content-Type': 'application/json'}
             p_payload = {"orderCode": st.session_state.order_id, "locationCode": "1992", "channelName": "NOON", "shipmentItems": [{"channelSkuCode": k, "quantityToPack": str(v)} for k, v in st.session_state.f_sku_map.items()]}
@@ -180,7 +200,8 @@ with t2:
                 st.session_state.inv_u = p_data.get('invoiceUrl')
                 st.session_state.lab_u = p_data.get('shippingLabelUrl')
                 requests.post(URLS["HANDOVER"], headers=headers, json={"channelName": "NOON", "locationCode": "1992", "orderCodes": [st.session_state.order_id], "transporter": "SELF"})
-                st.balloons(); st.success("Complete")
+                st.balloons(); st.success("Fulfillment Cycle Completed")
+        
         if 'inv_u' in st.session_state and st.session_state.inv_u:
             c1, c2 = st.columns(2)
             c1.markdown(f'<a href="{st.session_state.inv_u}" target="_blank" class="download-link">📄 Download Invoice</a>', unsafe_allow_html=True)
@@ -190,30 +211,75 @@ with t2:
 # --- TAB 3: ORDER MANAGER ---
 with t3:
     st.markdown('<div class="step-card">', unsafe_allow_html=True)
-    st.subheader("Order Management")
-    m_id = st.text_input("Enter Order ID", key="m_id_in")
-    if st.button("📋 Pack Existing Order"): st.info(f"Processing: {m_id}")
+    st.subheader("📦 Pack Existing Order")
+    m_id = st.text_input("Enter Increff Order ID", key="m_id_in")
+    if st.button("Pack Order Now"): st.info(f"Processing: {m_id}")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 4: ORDER CANCELLATION ---
+    st.markdown('<div class="step-card">', unsafe_allow_html=True)
+    st.subheader("🔍 Search Order Status")
+    chan_order_id = st.text_input("Enter Channel Order ID", key="search_chan_id")
+    if st.button("Check Current Status"):
+        headers = {'authUsername': CREDS["SUB_ORDER_SEARCH"]["user"], 'authdomainname': CREDS["SUB_ORDER_SEARCH"]["domain"], 'authPassword': CREDS["SUB_ORDER_SEARCH"]["pass"], 'clientid': CREDS["SUB_ORDER_SEARCH"]["client"], 'Content-Type': 'application/json'}
+        payload = {"pageNo": 1, "pageSize": 100, "channelOrderId": chan_order_id}
+        res = requests.post(URLS["SUB_ORDER_SEARCH"], headers=headers, json=payload)
+        if res.status_code == 200:
+            data = res.json()
+            orders = next((v for v in data.values() if isinstance(v, list)), [])
+            if orders:
+                filtered = [{"channelId": o.get("channelId") or o.get("channelName"), "channelOrderId": o.get("channelOrderId"), "status": o.get("status")} for o in orders]
+                st.table(pd.DataFrame(filtered))
+            else: st.warning("No entries found.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# --- TAB 4: CANCELLATION ---
 with t4:
     st.markdown('<div class="step-card">', unsafe_allow_html=True)
-    st.subheader("Order Cancellation")
-    c_type = st.radio("Reason", ["Customer Cancellation", "Seller Cancellation"], horizontal=True)
-    c_id = st.text_input("Order ID", key="c_id_in")
-    if st.button(f"Confirm {c_type}"): st.error(f"Action: {c_type} for {c_id}")
+    st.subheader("🛑 Cancellation Request")
+    cancel_type = st.radio("Cancellation Reason", ["Seller Cancellation", "Customer Cancellation"], horizontal=True)
+    col_oid, col_sku, col_qty = st.columns(3)
+    if cancel_type == "Customer Cancellation":
+        label_oid, help_txt = "Channel Order ID", "NEGHC0020018707-IO-1"
+    else:
+        label_oid, help_txt = "Order Code", "Levi's-Test2"
+        
+    oid_val = col_oid.text_input(label_oid, placeholder=help_txt, key="can_oid")
+    sku_val = col_sku.text_input("SKU", placeholder="055100...", key="can_sku")
+    qty_val = col_qty.text_input("Quantity", placeholder="1", key="can_qty")
+    
+    if st.button("Execute Cancellation"):
+        if oid_val and sku_val and qty_val:
+            try:
+                if cancel_type == "Customer Cancellation":
+                    url = f"{URLS['CANCEL_CUST_BASE']}/{oid_val}/cancel"
+                    headers = {'authUsername': CREDS["CANCEL_ORDER_CUST"]["user"], 'authPassword': CREDS["CANCEL_ORDER_CUST"]["pass"], 'Content-Type': 'application/json'}
+                    payload = {"locationCode": "WHBGN21", "orderItems": [{"channelSkuCode": sku_val, "cancelledQuantity": int(qty_val), "orderItemCode": sku_val}]}
+                else:
+                    url = URLS["CANCEL_SELLER"]
+                    headers = {'authUsername': CREDS["CANCEL_ORDER_SELLER"]["user"], 'authPassword': CREDS["CANCEL_ORDER_SELLER"]["pass"], 'Content-Type': 'application/json'}
+                    payload = {"orderCode": oid_val, "locationCode": "1992", "channelName": "NOON", "orderItems": [{"channelSkuCode": sku_val, "cancelledQuantity": str(qty_val)}]}
+                res = requests.put(url, headers=headers, json=payload)
+                if res.status_code in [200, 204]: st.success(f"Success! {cancel_type} processed for {oid_val}")
+                elif res.status_code == 502: st.error("🚨 502 Server Error: Staging server unavailable. Try again in 30 seconds.")
+                else: st.error(f"Failed: {res.text}")
+            except Exception as e: st.error(f"Error: {str(e)}")
+        else: st.warning("Please fill all fields.")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 5: RETURNS ---
 with t5:
-    r1, r2 = st.columns(2)
-    with r1:
+    ret_t1, ret_t2 = st.tabs(["Create Return", "Return Processing"])
+    
+    with ret_t1:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
-        st.subheader("Create Return")
-        st.text_input("Order ID", key="ret_id_in")
-        st.button("➕ Generate")
-    with r2:
+        st.subheader("➕ Create Return")
+        st.text_input("Order ID", key="ret_create_oid")
+        st.button("Generate Request", key="btn_ret_create")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+    with ret_t2:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
-        st.subheader("Return Processing")
-        st.text_input("Scan ID", key="proc_id_in")
-        st.button("Complete")
+        st.subheader("🔄 Process Received Return")
+        st.text_input("Scan ID / Order ID", key="ret_proc_id")
+        st.button("Complete Processing", key="btn_ret_proc")
+        st.markdown('</div>', unsafe_allow_html=True)
