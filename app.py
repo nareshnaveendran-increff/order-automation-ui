@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 # --- 1. Page Configuration ---
 st.set_page_config(
-    page_title="USP Auto",
+    page_title="Increff USP Automation",
     page_icon="🚚",
     layout="wide"
 )
@@ -312,3 +312,4 @@ with t6:
     else:
         st.warning("Please enter a keyword to generate the link.")
     st.markdown('</div>', unsafe_allow_html=True)
+
