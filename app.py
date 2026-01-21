@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 # --- 1. Page Configuration ---
 st.set_page_config(
-    page_title="USP Auto",
+    page_title="USP Automation",
     page_icon="🚚",
     layout="wide"
 )
@@ -287,3 +287,4 @@ with t5:
         st.text_input("Scan ID", key="ret_proc_id")
         st.button("Complete Processing")
         st.markdown('</div>', unsafe_allow_html=True)
+
