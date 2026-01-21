@@ -5,6 +5,8 @@ import time
 import os
 import base64
 import pandas as pd
+import random
+import string
 from datetime import datetime, timedelta
 
 # --- 1. Page Configuration ---
@@ -27,6 +29,9 @@ def set_high_qual_logo(path, height="60px"):
     if bin_str:
         return f'<img src="data:image/png;base64,{bin_str}" style="height: {height}; width: auto; object-fit: contain;">'
     return ""
+
+def generate_item_code():
+    return "RET-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
 
 # --- 3. UI Styling ---
 st.markdown("""
@@ -70,7 +75,10 @@ CREDS = {
     "PACK_DISPATCH": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"},
     "SUB_ORDER_SEARCH": {"user": "testing", "pass": "OqdR#Dv613", "domain": "staging1-omni", "client": "1200063685"},
     "CANCEL_ORDER_CUST": {"user": "NOON-1200063685", "pass": "73722c6c-c716-489c-88b8-5347132f5745"},
-    "CANCEL_ORDER_SELLER": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"}
+    "CANCEL_ORDER_SELLER": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"},
+    "CREATE_RETURN": {"user": "NOON-1200063685", "pass": "73722c6c-c716-489c-88b8-5347132f5745"},
+    "SEARCH_RETURN": {"user": "testing", "pass": "OqdR#Dv613", "domain": "staging1-omni", "client": "1200063685"},
+    "ORDER_STATUS_BULK": {"user": "testing", "pass": "OqdR#Dv613", "domain": "staging1-omni"}
 }
 
 URLS = {
@@ -81,7 +89,10 @@ URLS = {
     "HANDOVER": "https://staging-common-assure.increff.com/assure-magic2/ewms/push/usp/handover/combined",
     "SUB_ORDER_SEARCH": "https://staging1.omni.increff.com/oms/orders/outward/sub-orders/search",
     "CANCEL_CUST_BASE": "https://staging-common.omni.increff.com/assure-magic2/orders",
-    "CANCEL_SELLER": "https://staging-common-assure.increff.com/assure-magic2/usp/order/cancel"
+    "CANCEL_SELLER": "https://staging-common-assure.increff.com/assure-magic2/usp/order/cancel",
+    "RETURN_ORDER": "https://staging-common.omni.increff.com/assure-magic2/return/return-orders",
+    "RETURN_SEARCH": "https://staging1.omni.increff.com/oms/returnOrders/search",
+    "BULK_ORDER_SEARCH": "https://staging1.omni.increff.com/oms/usp/order/get-orders"
 }
 
 # --- 6. Session State ---
@@ -110,42 +121,30 @@ with t1:
                     res = requests.post(URLS["SEARCH"], headers=headers, json={"locationCode": "WHBGN21", "channelSkuCodes": sku_list})
                     if res.status_code == 200: 
                         st.session_state.inv_res = res.json().get("inventories", [])
-                    elif res.status_code == 502:
-                        st.error("🚨 502 Server Error: Staging server unavailable. Try again in 30 seconds.")
                     else: st.error(f"Failed: {res.text}")
                 except Exception as e: st.error(f"Error: {str(e)}")
-    
     if st.session_state.inv_res:
-        st.write("##")
         cols = st.columns(len(st.session_state.inv_res))
         for idx, item in enumerate(st.session_state.inv_res):
             with cols[idx]:
-                st.markdown(f'<div class="stock-card"><div class="stock-label">Stock</div><div class="stock-value">{item.get("qcPassAvailableQuantity", 0)}</div><div class="stock-sku">{item.get("channelSkuCode")}</div></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="stock-card"><div class="stock-value">{item.get("qcPassAvailableQuantity", 0)}</div><div class="stock-sku">{item.get("channelSkuCode")}</div></div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="step-card">', unsafe_allow_html=True)
     st.subheader("🆙 Update Absolute Inventory")
     u_col1, u_col2, u_col3 = st.columns([2, 1, 1])
-    with u_col1:
-        single_up_sku = st.text_input("Channel SKU Code", placeholder="e.g. LEVI_001", key="up_sku_input")
-    with u_col2:
-        single_up_qty = st.text_input("Quantity", placeholder="100", key="up_qty_input")
+    with u_col1: single_up_sku = st.text_input("Channel SKU Code", placeholder="e.g. LEVI_001", key="up_sku_input")
+    with u_col2: single_up_qty = st.text_input("Quantity", placeholder="100", key="up_qty_input")
     with u_col3:
         st.write("##")
-        update_clicked = st.button("Update Inventory", key="btn_up_inv")
-    
-    if update_clicked:
-        if single_up_sku and single_up_qty:
-            try:
-                headers = {'authUsername': CREDS["UPDATE_INV"]["user"], 'authPassword': CREDS["UPDATE_INV"]["pass"], 'Content-Type': 'application/json'}
-                up_payload = {"locationCode": "1992", "products": [{"channelSkuCode": single_up_sku, "quantity": single_up_qty}]}
-                res = requests.put(URLS["UPDATE"], headers=headers, json=up_payload)
-                if res.status_code == 200:
-                    st.success(f"Success! {single_up_sku} updated.")
-                elif res.status_code == 502:
-                    st.error("🚨 502 Server Error: Staging server unavailable.")
-                else: st.error(f"Update Failed: {res.text}")
-            except Exception as e: st.error(f"Error: {str(e)}")
+        if st.button("Update Inventory", key="btn_up_inv"):
+            if single_up_sku and single_up_qty:
+                try:
+                    headers = {'authUsername': CREDS["UPDATE_INV"]["user"], 'authPassword': CREDS["UPDATE_INV"]["pass"], 'Content-Type': 'application/json'}
+                    up_payload = {"locationCode": "1992", "products": [{"channelSkuCode": single_up_sku, "quantity": single_up_qty}]}
+                    res = requests.put(URLS["UPDATE"], headers=headers, json=up_payload)
+                    if res.status_code == 200: st.success("Updated!")
+                except Exception as e: st.error(str(e))
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 2: ORDER FULFILMENT ---
@@ -155,34 +154,17 @@ with t2:
     f_col1, f_col2 = st.columns(2)
     sku_qty_input = f_col1.text_input("Mapping (SKU:Qty)", placeholder="SKU:5", key="f_map")
     order_id_input = f_col2.text_input("Order ID", key="f_id")
-    
     if st.button("🛒 Generate Order"):
         try:
             mapping = [item.strip() for item in sku_qty_input.split(",") if ":" in item]
             sku_map = {p.split(":")[0].strip(): int(p.split(":")[1].strip()) for p in mapping}
             if sku_map:
                 now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000+05:30")
-                dispatch = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S.000+05:30")
-                payload = {
-                    "parentOrderCode": order_id_input, "locationCode": "WHBGN21", "orderCode": order_id_input,
-                    "orderTime": now, "orderType": "SO", "isPriority": False, "gift": False, "onHold": False,
-                    "qcStatus": "PASS", "dispatchByTime": dispatch, "startProcessingTime": now,
-                    "paymentMethod": "COD", "isSplitRequired": "false", "packType": "PIECE",
-                    "shippingAddress": {"name": "Naresh", "line1": "Dubai", "city": "Dubai", "zip": "000000", "country": "UAE", "phone": "9999999999"},
-                    "billingAddress": {"name": "Naresh", "line1": "Dubai", "city": "Dubai", "zip": "000000", "country": "UAE", "phone": "9999999999"},
-                    "orderItems": [{"channelSkuCode": k, "orderItemCode": k, "quantity": v, "sellerDiscountPerUnit": 10, "channelDiscountPerUnit": 10, "sellingPricePerUnit": 150, "shippingChargePerUnit": 20, "giftOptions": {"giftwrapRequired": False, "giftMessage": False, "giftChargePerUnit": None}} for k, v in sku_map.items()],
-                    "taxBreakupForms": [{"channelSkuId": k, "baseSellingPricePerUnit": 150.00, "taxItemForms": [{"type": "VAT", "rate": 5, "taxPerUnit": 2.13}]} for k, v in sku_map.items()],
-                    "orderCustomAttributes": {"currency": "AED"}
-                }
-                headers = {'authUsername': CREDS["CREATE_ORDER"]["user"], 'authPassword': CREDS["CREATE_ORDER"]["pass"], 'Content-Type': 'application/json'}
-                res = requests.post(URLS["CREATE"], headers=headers, json=payload)
+                payload = {"parentOrderCode": order_id_input, "locationCode": "WHBGN21", "orderCode": order_id_input, "orderTime": now, "orderType": "SO", "qcStatus": "PASS", "paymentMethod": "COD", "isSplitRequired": "false", "packType": "PIECE", "shippingAddress": {"name": "Naresh", "line1": "Dubai", "city": "Dubai", "zip": "000000", "country": "UAE", "phone": "9999999999"}, "billingAddress": {"name": "Naresh", "line1": "Dubai", "city": "Dubai", "zip": "000000", "country": "UAE", "phone": "9999999999"}, "orderItems": [{"channelSkuCode": k, "orderItemCode": k, "quantity": v, "sellerDiscountPerUnit": 10, "channelDiscountPerUnit": 10, "sellingPricePerUnit": 150, "shippingChargePerUnit": 20, "giftOptions": {"giftwrapRequired": False, "giftMessage": False, "giftChargePerUnit": None}} for k, v in sku_map.items()], "taxBreakupForms": [{"channelSkuId": k, "baseSellingPricePerUnit": 150.00, "taxItemForms": [{"type": "VAT", "rate": 5, "taxPerUnit": 2.13}]} for k, v in sku_map.items()], "orderCustomAttributes": {"currency": "AED"}}
+                res = requests.post(URLS["CREATE"], headers={'authUsername': CREDS["CREATE_ORDER"]["user"], 'authPassword': CREDS["CREATE_ORDER"]["pass"], 'Content-Type': 'application/json'}, json=payload)
                 if res.status_code in [200, 201]:
-                    st.session_state.order_id = order_id_input
-                    st.session_state.f_sku_map = sku_map
-                    st.success(f"Order {order_id_input} Created Successfully")
-                elif res.status_code == 502:
-                    st.error("🚨 502 Server Error: Staging server unavailable.")
-                else: st.error(f"Failed: {res.text}")
+                    st.session_state.order_id, st.session_state.f_sku_map = order_id_input, sku_map
+                    st.success(f"Order {order_id_input} Created")
         except Exception as e: st.error(str(e))
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -191,116 +173,117 @@ with t2:
     if not st.session_state.order_id:
         st.warning("⚠️ Action Required: Please create an order first to unlock the Packing and Handover Process")
     else:
-        st.info(f"✅ Active Order Ready: {st.session_state.order_id}")
         if st.button("📦 Execute Pack & Dispatch"):
-            with st.spinner("Processing Packing and Handover..."):
-                try:
-                    headers = {'authUsername': CREDS["PACK_DISPATCH"]["user"], 'authPassword': CREDS["PACK_DISPATCH"]["pass"], 'Content-Type': 'application/json'}
-                    p_payload = {
-                        "orderCode": st.session_state.order_id, 
-                        "locationCode": "1992", 
-                        "channelName": "NOON", 
-                        "shipmentItems": [{"channelSkuCode": k, "quantityToPack": str(v)} for k, v in st.session_state.f_sku_map.items()]
-                    }
-                    p_res = requests.post(URLS["PACK"], headers=headers, json=p_payload)
-                    
-                    if p_res.status_code == 200:
-                        data = p_res.json()
-                        # EXTRACTION FIX: Mapping the nested shipping label URL correctly
-                        st.session_state.inv_url = data.get("invoiceUrl")
-                        st.session_state.lab_url = data.get("shippingLabel", {}).get("shippingLabelUrl")
-                        
-                        # Trigger Handover
-                        requests.post(URLS["HANDOVER"], headers=headers, json={"channelName": "NOON", "locationCode": "1992", "orderCodes": [st.session_state.order_id], "transporter": "SELF"})
-                        st.balloons()
-                        st.success("Pack & Handover Successful!")
-                    else:
-                        st.error(f"Packing Failed: {p_res.text}")
-                except Exception as e:
-                    st.error(f"Error: {str(e)}")
-        
-        # Display Download Buttons
+            try:
+                headers = {'authUsername': CREDS["PACK_DISPATCH"]["user"], 'authPassword': CREDS["PACK_DISPATCH"]["pass"], 'Content-Type': 'application/json'}
+                p_res = requests.post(URLS["PACK"], headers=headers, json={"orderCode": st.session_state.order_id, "locationCode": "1992", "channelName": "NOON", "shipmentItems": [{"channelSkuCode": k, "quantityToPack": str(v)} for k, v in st.session_state.f_sku_map.items()]})
+                if p_res.status_code == 200:
+                    data = p_res.json()
+                    st.session_state.inv_url, st.session_state.lab_url = data.get("invoiceUrl"), data.get("shippingLabel", {}).get("shippingLabelUrl")
+                    requests.post(URLS["HANDOVER"], headers=headers, json={"channelName": "NOON", "locationCode": "1992", "orderCodes": [st.session_state.order_id], "transporter": "SELF"})
+                    st.balloons(); st.success("Success!")
+            except Exception as e: st.error(str(e))
         if st.session_state.inv_url or st.session_state.lab_url:
-            st.divider()
-            st.subheader("📄 Download Documents")
-            d_col1, d_col2 = st.columns(2)
-            if st.session_state.inv_url:
-                d_col1.markdown(f'<a href="{st.session_state.inv_url}" target="_blank" class="download-link">📥 Download Invoice</a>', unsafe_allow_html=True)
-            if st.session_state.lab_url:
-                d_col2.markdown(f'<a href="{st.session_state.lab_url}" target="_blank" class="download-link">📥 Download Shipping Label</a>', unsafe_allow_html=True)
-
+            c1, c2 = st.columns(2)
+            if st.session_state.inv_url: c1.markdown(f'<a href="{st.session_state.inv_url}" target="_blank" class="download-link">📥 Download Invoice</a>', unsafe_allow_html=True)
+            if st.session_state.lab_url: c2.markdown(f'<a href="{st.session_state.lab_url}" target="_blank" class="download-link">📥 Download Shipping Label</a>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 3: ORDER MANAGER ---
+# --- TAB 3: ORDER MANAGER (RIGHT BY RIGHT TABS) ---
 with t3:
-    st.markdown('<div class="step-card">', unsafe_allow_html=True)
-    st.subheader("📦 Pack Existing Order")
-    m_id = st.text_input("Enter Increff Order ID", key="m_id_in")
-    if st.button("Pack Order Now"): st.info(f"Processing: {m_id}")
-    st.markdown('</div>', unsafe_allow_html=True)
+    om_t1, om_t2, om_t3 = st.tabs(["📦 Pack Existing Order", "🔍 Search Specific Order", "🗓️ Last 7 Days Status"])
+    
+    with om_t1:
+        st.markdown('<div class="step-card">', unsafe_allow_html=True)
+        st.subheader("📦 Pack Existing Order")
+        m_id = st.text_input("Enter Increff Order ID", key="om_m_id")
+        if st.button("Pack Order Now"): st.info(f"Processing: {m_id}")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="step-card">', unsafe_allow_html=True)
-    st.subheader("🔍 Search Order Status")
-    chan_order_id = st.text_input("Enter Channel Order ID", key="search_chan_id")
-    if st.button("Check Current Status"):
-        headers = {'authUsername': CREDS["SUB_ORDER_SEARCH"]["user"], 'authdomainname': CREDS["SUB_ORDER_SEARCH"]["domain"], 'authPassword': CREDS["SUB_ORDER_SEARCH"]["pass"], 'clientid': CREDS["SUB_ORDER_SEARCH"]["client"], 'Content-Type': 'application/json'}
-        payload = {"pageNo": 1, "pageSize": 100, "channelOrderId": chan_order_id}
-        res = requests.post(URLS["SUB_ORDER_SEARCH"], headers=headers, json=payload)
-        if res.status_code == 200:
-            data = res.json()
-            orders = next((v for v in data.values() if isinstance(v, list)), [])
-            if orders:
-                filtered = [{"channelId": o.get("channelId") or o.get("channelName"), "channelOrderId": o.get("channelOrderId"), "status": o.get("status")} for o in orders]
-                st.table(pd.DataFrame(filtered))
-            else: st.warning("No entries found.")
-    st.markdown('</div>', unsafe_allow_html=True)
+    with om_t2:
+        st.markdown('<div class="step-card">', unsafe_allow_html=True)
+        st.subheader("🔍 Search Specific Order Status")
+        chan_order_id = st.text_input("Enter Channel Order ID", key="om_search_id")
+        if st.button("Check Current Status"):
+            headers = {'authUsername': CREDS["SUB_ORDER_SEARCH"]["user"], 'authdomainname': CREDS["SUB_ORDER_SEARCH"]["domain"], 'authPassword': CREDS["SUB_ORDER_SEARCH"]["pass"], 'clientid': CREDS["SUB_ORDER_SEARCH"]["client"], 'Content-Type': 'application/json'}
+            res = requests.post(URLS["SUB_ORDER_SEARCH"], headers=headers, json={"pageNo": 1, "pageSize": 100, "channelOrderId": chan_order_id})
+            if res.status_code == 200:
+                data = res.json()
+                orders = data if isinstance(data, list) else next((v for v in data.values() if isinstance(v, list)), [])
+                if orders:
+                    st.table(pd.DataFrame([{"channelOrderId": o.get("channelOrderId"), "channelId": o.get("channelId") or o.get("channelName"), "status": o.get("status")} for o in orders]))
+                else: st.warning("No entries found.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with om_t3:
+        st.markdown('<div class="step-card">', unsafe_allow_html=True)
+        st.subheader("🗓️ Last 7 Days Order Status")
+        if st.button("🚀 Fetch Recent Orders"):
+            end_t, start_t = datetime.now(), datetime.now() - timedelta(days=7)
+            fmt = "%Y-%m-%dT%H:%M:%S.000Z"
+            headers = {'authUsername': CREDS["ORDER_STATUS_BULK"]["user"], 'authPassword': CREDS["ORDER_STATUS_BULK"]["pass"], 'AuthDomainname': CREDS["ORDER_STATUS_BULK"]["domain"], 'Content-Type': 'application/json'}
+            payload = {"sortBy": "ID", "sortOrder": "DESC", "pageSize": 100, "pageNo": 1, "minOrderedAt": start_t.strftime(fmt), "maxOrderedAt": end_t.strftime(fmt), "fulfillmentLocationId": 1200063688}
+            res = requests.post(URLS["BULK_ORDER_SEARCH"], headers=headers, json=payload)
+            if res.status_code == 200:
+                data = res.json()
+                # FIXED: Logic to prevent 'list object has no attribute get'
+                orders_list = data if isinstance(data, list) else (data.get("orders") or data.get("orderList") or [])
+                if orders_list:
+                    st.table(pd.DataFrame([{"channelOrderId": o.get("channelOrderId"), "channelId": o.get("channelName") or o.get("channelId"), "status": o.get("status")} for o in orders_list]))
+                else: st.warning("No orders found.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 4: ORDER CANCELLATION ---
 with t4:
     st.markdown('<div class="step-card">', unsafe_allow_html=True)
-    st.subheader("🛑 Order Cancellation Request")
-    cancel_type = st.radio("Cancellation Reason", ["Seller Cancellation", "Customer Cancellation"], horizontal=True)
-    col_oid, col_sku, col_qty = st.columns(3)
-    if cancel_type == "Customer Cancellation":
-        label_oid, help_txt = "Channel Order ID", "NEGHC0020018707-IO-1"
-    else:
-        label_oid, help_txt = "Order Code", "Levi's-Test2"
-        
-    oid_val = col_oid.text_input(label_oid, placeholder=help_txt, key="can_oid")
-    sku_val = col_sku.text_input("SKU", placeholder="055100...", key="can_sku")
-    qty_val = col_qty.text_input("Quantity", placeholder="1", key="can_qty")
-    
+    cancel_type = st.radio("Reason", ["Seller Cancellation", "Customer Cancellation"], horizontal=True)
+    col1, col2, col3 = st.columns(3)
+    oid, sku, qty = col1.text_input("Order ID/Code", key="c_oid"), col2.text_input("SKU", key="c_sku"), col3.text_input("Qty", key="c_qty")
     if st.button("Execute Cancellation"):
-        if oid_val and sku_val and qty_val:
-            try:
-                if cancel_type == "Customer Cancellation":
-                    url = f"{URLS['CANCEL_CUST_BASE']}/{oid_val}/cancel"
-                    headers = {'authUsername': CREDS["CANCEL_ORDER_CUST"]["user"], 'authPassword': CREDS["CANCEL_ORDER_CUST"]["pass"], 'Content-Type': 'application/json'}
-                    payload = {"locationCode": "WHBGN21", "orderItems": [{"channelSkuCode": sku_val, "cancelledQuantity": int(qty_val), "orderItemCode": sku_val}]}
-                else:
-                    url = URLS["CANCEL_SELLER"]
-                    headers = {'authUsername': CREDS["CANCEL_ORDER_SELLER"]["user"], 'authPassword': CREDS["CANCEL_ORDER_SELLER"]["pass"], 'Content-Type': 'application/json'}
-                    payload = {"orderCode": oid_val, "locationCode": "1992", "channelName": "NOON", "orderItems": [{"channelSkuCode": sku_val, "cancelledQuantity": str(qty_val)}]}
-                res = requests.put(url, headers=headers, json=payload)
-                if res.status_code in [200, 204]: st.success(f"Success! {cancel_type} processed for {oid_val}")
-                elif res.status_code == 502: st.error("🚨 502 Server Error: Staging server unavailable.")
-                else: st.error(f"Failed: {res.text}")
-            except Exception as e: st.error(f"Error: {str(e)}")
-        else: st.warning("Please fill all fields.")
+        try:
+            if cancel_type == "Customer Cancellation":
+                url, headers = f"{URLS['CANCEL_CUST_BASE']}/{oid}/cancel", {'authUsername': CREDS["CANCEL_ORDER_CUST"]["user"], 'authPassword': CREDS["CANCEL_ORDER_CUST"]["pass"], 'Content-Type': 'application/json'}
+                payload = {"locationCode": "WHBGN21", "orderItems": [{"channelSkuCode": sku, "cancelledQuantity": int(qty), "orderItemCode": sku}]}
+            else:
+                url, headers = URLS["CANCEL_SELLER"], {'authUsername': CREDS["CANCEL_ORDER_SELLER"]["user"], 'authPassword': CREDS["CANCEL_ORDER_SELLER"]["pass"], 'Content-Type': 'application/json'}
+                payload = {"orderCode": oid, "locationCode": "1992", "channelName": "NOON", "orderItems": [{"channelSkuCode": sku, "cancelledQuantity": str(qty)}]}
+            res = requests.put(url, headers=headers, json=payload)
+            if res.status_code in [200, 204]: st.success("Success!")
+            else: st.error(res.text)
+        except Exception as e: st.error(str(e))
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 5: RETURNS ---
 with t5:
-    ret_t1, ret_t2 = st.tabs(["Create Return", "Return Processing"])
-    with ret_t1:
+    rt1, rt2, rt3 = st.tabs(["➕ Create Return", "🔍 Search Return", "🔄 Return Processing"])
+    with rt1:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         st.subheader("➕ Create Return Request")
-        st.text_input("Order ID", key="ret_create_oid")
-        st.button("Generate Request", key="btn_ret_create")
+        r_col1, r_col2 = st.columns(2)
+        f_ord, awb = r_col1.text_input("Order Code", key="r_f"), r_col2.text_input("AWB", key="r_a")
+        sk_qt = st.text_input("SKU:Qty", key="r_m")
+        if st.button("Generate Return"):
+            items = []
+            for pair in sk_qt.split(","):
+                s, q = pair.split(":")[0].strip(), int(pair.split(":")[1].strip())
+                for _ in range(q): items.append({"itemCode": generate_item_code(), "reason": "damaged", "channelSkuCode": s})
+            res = requests.post(URLS["RETURN_ORDER"], headers={'authUsername': CREDS["CREATE_RETURN"]["user"], 'authPassword': CREDS["CREATE_RETURN"]["pass"], 'Content-Type': 'application/json'}, json={"forwardOrderCode": f_ord, "returnOrderCode": f"r1-{f_ord}", "locationCode": "WHBGN21", "orderItems": items, "orderType": "CUSTOMER_RETURN", "awbNumber": awb, "transporter": "SELF", "dropAddress": {"name": "Naresh", "line1": "address"}, "pickupAddress": {"name": "Naresh", "line1": "address"}})
+            if res.status_code in [200, 201]: st.success("Return Created!")
         st.markdown('</div>', unsafe_allow_html=True)
-    with ret_t2:
+    with rt2:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
-        st.subheader("🔄 Process Received Return")
-        st.text_input("Scan ID / Order ID", key="ret_proc_id")
-        st.button("Complete Processing", key="btn_ret_proc")
+        st.subheader("🔍 Search Recent Returns (7 Days)")
+        if st.button("Run Return Search"):
+            end, start = datetime.now(), datetime.now() - timedelta(days=7)
+            res = requests.post(URLS["RETURN_SEARCH"], headers={'authUsername': CREDS["SEARCH_RETURN"]["user"], 'authdomainname': CREDS["SEARCH_RETURN"]["domain"], 'authPassword': CREDS["SEARCH_RETURN"]["pass"], 'clientid': CREDS["SEARCH_RETURN"]["client"], 'Content-Type': 'application/json'}, json={"startDate": start.strftime("%Y-%m-%dT%H:%M:%S.000Z"), "endDate": end.strftime("%Y-%m-%dT%H:%M:%S.000Z"), "sortBy": "ID", "sortOrder": "DESC", "maxCount": 100, "fulfillmentLocationId": 1200063688})
+            if res.status_code == 200:
+                data = res.json()
+                rets = data if isinstance(data, list) else (data.get("returnOrderList") or [])
+                st.table(pd.DataFrame([{"channelOrderId": r.get("channelOrderId"), "channelReturnId": r.get("channelReturnId"), "trackingId": r.get("trackingId"), "status": r.get("status")} for r in rets]))
+        st.markdown('</div>', unsafe_allow_html=True)
+    with rt3:
+        st.markdown('<div class="step-card">', unsafe_allow_html=True)
+        st.subheader("🔄 Return Processing")
+        st.text_input("Scan ID", key="ret_proc_id")
+        st.button("Complete Processing")
         st.markdown('</div>', unsafe_allow_html=True)
