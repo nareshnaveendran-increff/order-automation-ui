@@ -34,6 +34,15 @@ def set_high_qual_logo(path, height="60px"):
 def generate_item_code(prefix="xyz"):
     return prefix + ''.join(random.choices(string.digits, k=4))
 
+def download_and_rename(url, order_id, suffix):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.content
+        return None
+    except:
+        return None
+
 # --- 3. UI Styling ---
 st.markdown("""
     <style>
@@ -51,11 +60,6 @@ st.markdown("""
         background-color: #005a9e; border-radius: 8px; font-weight: 700; text-align: center; margin-top: 10px; font-size: 1.1rem;
     }
     .elk-button:hover { background-color: #004578; color: white !important; text-decoration: none; }
-    .download-link {
-        display: block; padding: 12px; color: white !important; text-decoration: none;
-        background-color: #2e7d32; border-radius: 8px; font-weight: 700; text-align: center; margin-top: 10px; font-size: 1rem;
-    }
-    .download-link:hover { background-color: #1b5e20; text-decoration: none; color: #ffffff !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -84,7 +88,10 @@ CREDS = {
     "CREATE_RETURN": {"user": "NOON-1200063685", "pass": "73722c6c-c716-489c-88b8-5347132f5745"},
     "SEARCH_RETURN": {"user": "testing", "pass": "OqdR#Dv613", "domain": "staging1-omni", "client": "1200063685"},
     "ORDER_STATUS_BULK": {"user": "testing", "pass": "OqdR#Dv613", "domain": "staging1-omni"},
-    "PROCESS_RETURN": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"}
+    "PROCESS_RETURN": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"},
+    "CREATE_ARTICLE": {"user": "LEVI_ERP-1200063685", "pass": "7e230f29-3c8d-4cea-9a17-f8a7dfe66caf"},
+    "CREATE_MP": {"user": "testing", "pass": "OqdR#Dv613", "domain": "staging1-omni"},
+    "CREATE_EFS": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"}
 }
 
 URLS = {
@@ -99,7 +106,10 @@ URLS = {
     "RETURN_ORDER": "https://staging-common.omni.increff.com/assure-magic2/return/return-orders",
     "RETURN_SEARCH": "https://staging1.omni.increff.com/oms/returnOrders/search",
     "BULK_ORDER_SEARCH": "https://staging1.omni.increff.com/oms/usp/order/get-orders",
-    "PROCESS_RETURN": "https://staging-common-assure.increff.com/assure-magic2/usp/return"
+    "PROCESS_RETURN": "https://staging-common-assure.increff.com/assure-magic2/usp/return",
+    "MASTER_ARTICLE": "https://staging-common.omni.increff.com/assure-magic2/master/articles",
+    "MASTER_MP": "https://staging1.omni.increff.com/cims/skulisting?clientChannelId=3552&status=ENABLED",
+    "MASTER_EFS": "https://staging-common-assure.increff.com/assure-magic2/usp/listing/create"
 }
 
 # --- 6. Session State ---
@@ -110,7 +120,92 @@ if 'om_inv_url' not in st.session_state: st.session_state.om_inv_url = None
 if 'om_lab_url' not in st.session_state: st.session_state.om_lab_url = None
 
 # --- 7. Main Tabs ---
-t1, t2, t3, t4, t5, t6 = st.tabs(["📊 Inventory management", "🚀 Order Fulfilment", "📦 Order Manager", "🛑 Order Cancellation", "🔄 Returns", "📋 Logs"])
+t0, t1, t2, t3, t4, t5, t6 = st.tabs([
+    "👑 Master", "📊 Inventory management", "🚀 Order Fulfilment", 
+    "📦 Order Manager", "🛑 Order Cancellation", "🔄 Returns", "📋 Logs"
+])
+
+# --- TAB 0: MASTER ---
+with t0:
+    m_tabs = st.tabs(["➕ Create Article", "🛍️ Create MP Listing", "📦 Create EFS Listing"])
+    
+    # MASTER SUB-TAB 1: CREATE ARTICLE
+    with m_tabs[0]:
+        st.markdown('<div class="step-card">', unsafe_allow_html=True)
+        st.subheader("Create New Article Master")
+        c_sku_id = st.text_input("Enter Client SKU ID", placeholder="e.g. LEVI11", key="mast_art_sku")
+        if st.button("🚀 Create Article"):
+            if c_sku_id:
+                article_payload = {"articleMasters": [{"channelSkuCode": c_sku_id, "clientSkuId": c_sku_id, "channelSerialNo": c_sku_id, "barcode": c_sku_id, "category": "BOTTOMS", "brand": "10", "isUom": False, "styleCode": "LEVI1", "mrp": 500, "hsn": "6110200000", "name": "501 '90S TWISTED SISTER SELVEDGE", "taxRule": "GST_5", "size": "29", "color": "28", "isPerishable": False, "isVirtual": False, "isBundled": False, "isSerialCodeRequired": False}]}
+                headers = {'authUsername': CREDS["CREATE_ARTICLE"]["user"], 'authPassword': CREDS["CREATE_ARTICLE"]["pass"], 'Content-Type': 'application/json'}
+                try:
+                    res = requests.post(URLS["MASTER_ARTICLE"], headers=headers, json=article_payload)
+                    if res.status_code in [200, 201, 204]:
+                        st.success(f"Article processed successfully (Status: {res.status_code})")
+                        if res.text.strip(): st.json(res.json())
+                    else: st.error(f"Error {res.status_code}: {res.text}")
+                except Exception as e: st.error(f"Execution Error: {str(e)}")
+            else: st.warning("Please provide a Client SKU ID.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # MASTER SUB-TAB 2: CREATE MP LISTING
+    with m_tabs[1]:
+        st.markdown('<div class="step-card">', unsafe_allow_html=True)
+        st.subheader("🛍️ Create MP Listing")
+        mp_sku_id = st.text_input("Enter Client SKU ID", placeholder="e.g. LEVI-2301-1", key="mast_mp_sku")
+        if st.button("🛍️ Create Listing", key="btn_create_mp"):
+            if mp_sku_id:
+                mp_payload = [{
+                    "clientSkuId": mp_sku_id,
+                    "channelSerialNo": mp_sku_id,
+                    "channelSkuId": mp_sku_id,
+                    "clientId": 1200063685,
+                    "channelId": "NOON"
+                }]
+                headers = {
+                    'authUsername': CREDS["CREATE_MP"]["user"],
+                    'authPassword': CREDS["CREATE_MP"]["pass"],
+                    'authdomainname': CREDS["CREATE_MP"]["domain"],
+                    'Content-Type': 'application/json'
+                }
+                try:
+                    res = requests.post(URLS["MASTER_MP"], headers=headers, json=mp_payload)
+                    if res.status_code in [200, 201, 204]:
+                        st.success(f"MP Listing created successfully (Status: {res.status_code})")
+                        if res.text.strip(): st.json(res.json())
+                    else: st.error(f"Error {res.status_code}: {res.text}")
+                except Exception as e: st.error(f"Execution Error: {str(e)}")
+            else: st.warning("Please provide a Client SKU ID.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # MASTER SUB-TAB 3: CREATE EFS LISTING
+    with m_tabs[2]:
+        st.markdown('<div class="step-card">', unsafe_allow_html=True)
+        st.subheader("📦 Create EFS Listing")
+        efs_sku_id = st.text_input("Enter Channel SKU Code", placeholder="e.g. LEVI-2301", key="mast_efs_sku")
+        if st.button("📦 Create Listing", key="btn_create_efs"):
+            if efs_sku_id:
+                efs_payload = {
+                    "skuListings": [{
+                        "channelSkuCode": efs_sku_id,
+                        "channelSerialNo": efs_sku_id,
+                        "barcode": efs_sku_id
+                    }]
+                }
+                headers = {
+                    'authUsername': CREDS["CREATE_EFS"]["user"],
+                    'authPassword': CREDS["CREATE_EFS"]["pass"],
+                    'Content-Type': 'application/json'
+                }
+                try:
+                    res = requests.post(URLS["MASTER_EFS"], headers=headers, json=efs_payload)
+                    if res.status_code in [200, 201, 204]:
+                        st.success(f"EFS Listing created successfully (Status: {res.status_code})")
+                        if res.text.strip(): st.json(res.json())
+                    else: st.error(f"Error {res.status_code}: {res.text}")
+                except Exception as e: st.error(f"Execution Error: {str(e)}")
+            else: st.warning("Please provide a Channel SKU Code.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 1: INVENTORY MANAGEMENT ---
 with t1:
@@ -175,13 +270,22 @@ with t2:
         if st.button("📦 Execute Pack & Dispatch"):
             p_res = requests.post(URLS["PACK"], headers={'authUsername': CREDS["PACK_DISPATCH"]["user"], 'authPassword': CREDS["PACK_DISPATCH"]["pass"], 'Content-Type': 'application/json'}, json={"orderCode": st.session_state.order_id, "locationCode": "1992", "channelName": "NOON", "shipmentItems": [{"channelSkuCode": k, "quantityToPack": str(v)} for k, v in st.session_state.f_sku_map.items()]})
             if p_res.status_code == 200:
-                data = p_res.json(); st.session_state.om_inv_url, st.session_state.om_lab_url = data.get("invoiceUrl"), data.get("shippingLabel", {}).get("shippingLabelUrl")
+                data = p_res.json()
+                st.session_state.om_inv_url, st.session_state.om_lab_url = data.get("invoiceUrl"), data.get("shippingLabel", {}).get("shippingLabelUrl")
                 requests.post(URLS["HANDOVER"], headers={'authUsername': CREDS["PACK_DISPATCH"]["user"], 'authPassword': CREDS["PACK_DISPATCH"]["pass"], 'Content-Type': 'application/json'}, json={"channelName": "NOON", "locationCode": "1992", "orderCodes": [st.session_state.order_id], "transporter": "SELF"})
-                st.balloons(); st.success("order packed and dispacted")
+                st.balloons(); st.success("Order packed and dispatched")
+
         if st.session_state.om_inv_url or st.session_state.om_lab_url:
+            st.divider()
             c1, c2 = st.columns(2)
-            if st.session_state.om_inv_url: c1.markdown(f'<a href="{st.session_state.om_inv_url}" target="_blank" class="download-link">📥 Download Invoice</a>', unsafe_allow_html=True)
-            if st.session_state.om_lab_url: c2.markdown(f'<a href="{st.session_state.om_lab_url}" target="_blank" class="download-link">📥 Download Label</a>', unsafe_allow_html=True)
+            if st.session_state.om_inv_url:
+                inv_bytes = download_and_rename(st.session_state.om_inv_url, st.session_state.order_id, "Invoice")
+                if inv_bytes:
+                    c1.download_button(label="📥 Download Invoice", data=inv_bytes, file_name=f"{st.session_state.order_id}_Invoice.pdf", mime="application/pdf", use_container_width=True)
+            if st.session_state.om_lab_url:
+                lab_bytes = download_and_rename(st.session_state.om_lab_url, st.session_state.order_id, "shipLabel")
+                if lab_bytes:
+                    c2.download_button(label="📥 Download Label", data=lab_bytes, file_name=f"{st.session_state.order_id}_shipLabel.pdf", mime="application/pdf", use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 3: ORDER MANAGER ---
@@ -195,15 +299,20 @@ with t3:
             p_headers = {'authUsername': CREDS["PACK_DISPATCH"]["user"], 'authPassword': CREDS["PACK_DISPATCH"]["pass"], 'Content-Type': 'application/json'}
             p_res = requests.post(URLS["PACK"], headers=p_headers, json={"orderCode": po, "locationCode": "1992", "channelName": "NOON", "shipmentItems": [{"channelSkuCode": ps, "quantityToPack": str(pq)}]})
             if p_res.status_code == 200:
-                h_res = requests.post(URLS["HANDOVER"], headers=p_headers, json={"channelName": "NOON", "locationCode": "1992", "orderCodes": [po], "transporter": "SELF"})
-                if h_res.status_code == 200:
-                    d = p_res.json(); st.session_state.om_inv_url, st.session_state.om_lab_url = d.get("invoiceUrl"), d.get("shippingLabel", {}).get("shippingLabelUrl")
-                    st.success("order packed and dispacted")
+                requests.post(URLS["HANDOVER"], headers=p_headers, json={"channelName": "NOON", "locationCode": "1992", "orderCodes": [po], "transporter": "SELF"})
+                d = p_res.json()
+                st.session_state.om_inv_url, st.session_state.om_lab_url = d.get("invoiceUrl"), d.get("shippingLabel", {}).get("shippingLabelUrl")
+                st.success("Order packed and dispatched")
         if st.session_state.om_inv_url or st.session_state.om_lab_url:
             c1, c2 = st.columns(2)
-            if st.session_state.om_inv_url: c1.markdown(f'<a href="{st.session_state.om_inv_url}" target="_blank" class="download-link">📥 Invoice</a>', unsafe_allow_html=True)
-            if st.session_state.om_lab_url: c2.markdown(f'<a href="{st.session_state.om_lab_url}" target="_blank" class="download-link">📥 Label</a>', unsafe_allow_html=True)
+            if st.session_state.om_inv_url:
+                inv_bytes = download_and_rename(st.session_state.om_inv_url, po, "Invoice")
+                if inv_bytes: c1.download_button(label="📥 Invoice", data=inv_bytes, file_name=f"{po}_Invoice.pdf", mime="application/pdf")
+            if st.session_state.om_lab_url:
+                lab_bytes = download_and_rename(st.session_state.om_lab_url, po, "shipLabel")
+                if lab_bytes: c2.download_button(label="📥 Label", data=lab_bytes, file_name=f"{po}_shipLabel.pdf", mime="application/pdf")
         st.markdown('</div>', unsafe_allow_html=True)
+        
     with om_t2:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         ci = st.text_input("Channel Order ID", key="omsi")
@@ -274,11 +383,11 @@ with t5:
     with rt3:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         c1, c2 = st.columns(2); pf, pr = c1.text_input("Forward Order Code", key="pfo"), c2.text_input("Return Order Code", key="pro")
-        c3, c4 = st.columns(2); pa, ps = c3.text_input("AWB", key="pab"), c4.text_input("SKU", key="psk")
+        c3, c4 = st.columns(2); pa, ps = c3.text_input("Tracking Number", key="pab"), c4.text_input("SKU", key="psk")
         pq = st.selectbox("QC Status", ["PASS", "FAIL"], key="pqc")
         if st.button("Process Return"):
             res = requests.post(URLS["PROCESS_RETURN"], headers={'authUsername': CREDS["PROCESS_RETURN"]["user"], 'authPassword': CREDS["PROCESS_RETURN"]["pass"], 'Content-Type': 'application/json'}, json={"returnOrderCode": pr, "forwardOrderCode": pf, "locationCode": "1992", "channelName": "NOON", "awbNumber": pa, "transporter": "SELF", "orderItems": [{"returnItemCode": generate_item_code("xyz"), "channelSkuCode": ps, "qcStatus": pq, "qcReason": "07"}]})
-            if res.status_code in [200, 201]: st.success("Success!")
+            if res.status_code in [200, 201]: st.success("Return Processed Successfully!")
             else: st.error(res.text)
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -290,26 +399,14 @@ with t6:
     lk = l1.text_input("Keyword", key="lk_main")
     lr = l2.text_input("Request Name (Optional)", key="lk_req")
     ls = l3.text_input("Status (Optional)", key="lk_stat")
-    
     st.info("**Instructions:** Use `admin` / `admin` to login.")
-    
     if lk:
-        # Re-applying the Lucene Logic exactly as requested
         lucene_query = f'"{lk}"'
-        if lr:
-            lucene_query += f' AND request_name: *{lr}*'
-        if ls:
-            lucene_query += f' AND status: *{ls}*'
-        
+        if lr: lucene_query += f' AND request_name: *{lr}*'
+        if ls: lucene_query += f' AND status: *{ls}*'
         query_encoded = urllib.parse.quote(lucene_query)
         elk_url = f"https://elk-dev.nextscm.com/app/kibana#/discover?_g=(time:(from:now-30m,to:now))&_a=(query:(language:lucene,query:'{query_encoded}'))"
-        
-        st.markdown(f"""
-            <div style="margin-top: 20px;">
-                <p>Query: <code>{lucene_query}</code></p>
-                <a href="{elk_url}" target="_blank" class="elk-button">🔍 Open ELK Search</a>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div style="margin-top: 20px;"><p>Query: <code>{lucene_query}</code></p><a href="{elk_url}" target="_blank" class="elk-button">🔍 Open ELK Search</a></div>', unsafe_allow_html=True)
     else:
         st.warning("Please enter a keyword to generate the search link.")
     st.markdown('</div>', unsafe_allow_html=True)
