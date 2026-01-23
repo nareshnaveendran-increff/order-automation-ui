@@ -43,7 +43,7 @@ def download_and_rename(url, order_id, suffix):
     except:
         return None
 
-# --- 3. UI Styling ---
+# --- 3. UI Styling & Animation ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -60,6 +60,29 @@ st.markdown("""
         background-color: #005a9e; border-radius: 8px; font-weight: 700; text-align: center; margin-top: 10px; font-size: 1.1rem;
     }
     .elk-button:hover { background-color: #004578; color: white !important; text-decoration: none; }
+    
+    /* Truck/Biker Animation CSS - Set to 6 Seconds */
+    @keyframes moveAcross {
+        0% { transform: translateX(-150%); }
+        100% { transform: translateX(2500%); }
+    }
+    .dispatch-anim {
+        position: fixed; top: 40%; left: 0; font-size: 85px; z-index: 9999;
+        animation: moveAcross 6s linear forwards;
+    }
+    .dispatch-text-bubble {
+        position: fixed; top: 55%; left: 50%; transform: translateX(-50%);
+        background: #d32f2f; color: white; padding: 18px 36px; border-radius: 40px;
+        font-weight: 800; font-size: 28px; z-index: 9999;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        animation: fadeInOut 6s forwards;
+    }
+    @keyframes fadeInOut {
+        0% { opacity: 0; }
+        15% { opacity: 1; }
+        85% { opacity: 1; }
+        100% { opacity: 0; }
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -118,6 +141,7 @@ if 'order_id' not in st.session_state: st.session_state.order_id = ""
 if 'f_sku_map' not in st.session_state: st.session_state.f_sku_map = {}
 if 'om_inv_url' not in st.session_state: st.session_state.om_inv_url = None
 if 'om_lab_url' not in st.session_state: st.session_state.om_lab_url = None
+if 'show_truck' not in st.session_state: st.session_state.show_truck = False
 
 # --- 7. Main Tabs ---
 t0, t1, t2, t3, t4, t5, t6 = st.tabs([
@@ -128,8 +152,6 @@ t0, t1, t2, t3, t4, t5, t6 = st.tabs([
 # --- TAB 0: MASTER ---
 with t0:
     m_tabs = st.tabs(["➕ Create Article", "🛍️ Create MP Listing", "📦 Create EFS Listing"])
-    
-    # MASTER SUB-TAB 1: CREATE ARTICLE
     with m_tabs[0]:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         st.subheader("Create New Article Master")
@@ -141,70 +163,38 @@ with t0:
                 try:
                     res = requests.post(URLS["MASTER_ARTICLE"], headers=headers, json=article_payload)
                     if res.status_code in [200, 201, 204]:
-                        st.success(f"Article processed successfully (Status: {res.status_code})")
+                        st.success(f"Article Created (Status: {res.status_code})")
                         if res.text.strip(): st.json(res.json())
                     else: st.error(f"Error {res.status_code}: {res.text}")
                 except Exception as e: st.error(f"Execution Error: {str(e)}")
-            else: st.warning("Please provide a Client SKU ID.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # MASTER SUB-TAB 2: CREATE MP LISTING
     with m_tabs[1]:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         st.subheader("🛍️ Create MP Listing")
-        mp_sku_id = st.text_input("Enter Client SKU ID", placeholder="e.g. LEVI-2301-1", key="mast_mp_sku")
+        mp_sku_id = st.text_input("Enter Client SKU ID", key="mast_mp_sku")
         if st.button("🛍️ Create Listing", key="btn_create_mp"):
             if mp_sku_id:
-                mp_payload = [{
-                    "clientSkuId": mp_sku_id,
-                    "channelSerialNo": mp_sku_id,
-                    "channelSkuId": mp_sku_id,
-                    "clientId": 1200063685,
-                    "channelId": "NOON"
-                }]
-                headers = {
-                    'authUsername': CREDS["CREATE_MP"]["user"],
-                    'authPassword': CREDS["CREATE_MP"]["pass"],
-                    'authdomainname': CREDS["CREATE_MP"]["domain"],
-                    'Content-Type': 'application/json'
-                }
+                mp_payload = [{"clientSkuId": mp_sku_id, "channelSerialNo": mp_sku_id, "channelSkuId": mp_sku_id, "clientId": 1200063685, "channelId": "NOON"}]
+                headers = {'authUsername': CREDS["CREATE_MP"]["user"], 'authPassword': CREDS["CREATE_MP"]["pass"], 'authdomainname': CREDS["CREATE_MP"]["domain"], 'Content-Type': 'application/json'}
                 try:
                     res = requests.post(URLS["MASTER_MP"], headers=headers, json=mp_payload)
-                    if res.status_code in [200, 201, 204]:
-                        st.success(f"MP Listing created successfully (Status: {res.status_code})")
-                        if res.text.strip(): st.json(res.json())
-                    else: st.error(f"Error {res.status_code}: {res.text}")
-                except Exception as e: st.error(f"Execution Error: {str(e)}")
-            else: st.warning("Please provide a Client SKU ID.")
+                    if res.status_code in [200, 201]: st.success("MarketPlace Listing created")
+                except Exception as e: st.error(str(e))
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # MASTER SUB-TAB 3: CREATE EFS LISTING
     with m_tabs[2]:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         st.subheader("📦 Create EFS Listing")
-        efs_sku_id = st.text_input("Enter Channel SKU Code", placeholder="e.g. LEVI-2301", key="mast_efs_sku")
+        efs_sku_id = st.text_input("Enter Channel SKU Code", key="mast_efs_sku")
         if st.button("📦 Create Listing", key="btn_create_efs"):
             if efs_sku_id:
-                efs_payload = {
-                    "skuListings": [{
-                        "channelSkuCode": efs_sku_id,
-                        "channelSerialNo": efs_sku_id,
-                        "barcode": efs_sku_id
-                    }]
-                }
-                headers = {
-                    'authUsername': CREDS["CREATE_EFS"]["user"],
-                    'authPassword': CREDS["CREATE_EFS"]["pass"],
-                    'Content-Type': 'application/json'
-                }
+                efs_payload = {"skuListings": [{"channelSkuCode": efs_sku_id, "channelSerialNo": efs_sku_id, "barcode": efs_sku_id}]}
+                headers = {'authUsername': CREDS["CREATE_EFS"]["user"], 'authPassword': CREDS["CREATE_EFS"]["pass"], 'Content-Type': 'application/json'}
                 try:
                     res = requests.post(URLS["MASTER_EFS"], headers=headers, json=efs_payload)
-                    if res.status_code in [200, 201, 204]:
-                        st.success(f"EFS Listing created successfully (Status: {res.status_code})")
-                        if res.text.strip(): st.json(res.json())
-                    else: st.error(f"Error {res.status_code}: {res.text}")
-                except Exception as e: st.error(f"Execution Error: {str(e)}")
-            else: st.warning("Please provide a Channel SKU Code.")
+                    if res.status_code in [200, 201]: st.success("EFS Listing created")
+                except Exception as e: st.error(str(e))
         st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 1: INVENTORY MANAGEMENT ---
@@ -213,9 +203,9 @@ with t1:
     st.subheader("🔍 Check Live Inventory")
     s_col1, s_col2 = st.columns([4, 1])
     with s_col1:
-        search_skus = st.text_input("Enter SKU Codes (comma separated)", placeholder="SKU1, SKU2", key="inv_search_input", label_visibility="collapsed")
+        search_skus = st.text_input("Enter SKU Codes", key="inv_search_input", label_visibility="collapsed")
     with s_col2:
-        if st.button("Check Stock", key="btn_check_inv"):
+        if st.button("Check Stock"):
             sku_list = [s.strip() for s in search_skus.split(",") if s.strip()]
             if sku_list:
                 res = requests.post(URLS["SEARCH"], headers={'authUsername': CREDS["SEARCH_INV"]["user"], 'authPassword': CREDS["SEARCH_INV"]["pass"], 'Content-Type': 'application/json'}, json={"locationCode": "WHBGN21", "channelSkuCodes": sku_list})
@@ -237,7 +227,7 @@ with t1:
         st.write("##")
         if st.button("Update Inventory", key="btn_up_inv"):
             res = requests.put(URLS["UPDATE"], headers={'authUsername': CREDS["UPDATE_INV"]["user"], 'authPassword': CREDS["UPDATE_INV"]["pass"], 'Content-Type': 'application/json'}, json={"locationCode": "1992", "products": [{"channelSkuCode": single_up_sku, "quantity": single_up_qty}]})
-            if res.status_code == 200: st.success("Updated!")
+            if res.status_code == 200: st.success("Inventory Updated!")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 2: ORDER FULFILMENT ---
@@ -273,7 +263,18 @@ with t2:
                 data = p_res.json()
                 st.session_state.om_inv_url, st.session_state.om_lab_url = data.get("invoiceUrl"), data.get("shippingLabel", {}).get("shippingLabelUrl")
                 requests.post(URLS["HANDOVER"], headers={'authUsername': CREDS["PACK_DISPATCH"]["user"], 'authPassword': CREDS["PACK_DISPATCH"]["pass"], 'Content-Type': 'application/json'}, json={"channelName": "NOON", "locationCode": "1992", "orderCodes": [st.session_state.order_id], "transporter": "SELF"})
-                st.balloons(); st.success("Order packed and dispatched")
+                
+                # Show Truck Animation
+                st.session_state.show_truck = True
+                st.rerun()
+
+        # Animation Trigger
+        if st.session_state.show_truck:
+            st.markdown('<div class="dispatch-text-bubble">Order Dispatched</div>', unsafe_allow_html=True)
+            st.markdown('<div class="dispatch-anim">🚚💨</div>', unsafe_allow_html=True)
+            time.sleep(6) # Wait for truck to finish crossing
+            st.session_state.show_truck = False
+            st.rerun()
 
         if st.session_state.om_inv_url or st.session_state.om_lab_url:
             st.divider()
@@ -281,11 +282,11 @@ with t2:
             if st.session_state.om_inv_url:
                 inv_bytes = download_and_rename(st.session_state.om_inv_url, st.session_state.order_id, "Invoice")
                 if inv_bytes:
-                    c1.download_button(label="📥 Download Invoice", data=inv_bytes, file_name=f"{st.session_state.order_id}_Invoice.pdf", mime="application/pdf", use_container_width=True)
+                    c1.download_button(label="📥 Invoice", data=inv_bytes, file_name=f"{st.session_state.order_id}_Invoice.pdf", mime="application/pdf", use_container_width=True)
             if st.session_state.om_lab_url:
                 lab_bytes = download_and_rename(st.session_state.om_lab_url, st.session_state.order_id, "shipLabel")
                 if lab_bytes:
-                    c2.download_button(label="📥 Download Label", data=lab_bytes, file_name=f"{st.session_state.order_id}_shipLabel.pdf", mime="application/pdf", use_container_width=True)
+                    c2.download_button(label="📥 Shipping Label", data=lab_bytes, file_name=f"{st.session_state.order_id}_shipLabel.pdf", mime="application/pdf", use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 3: ORDER MANAGER ---
@@ -310,7 +311,7 @@ with t3:
                 if inv_bytes: c1.download_button(label="📥 Invoice", data=inv_bytes, file_name=f"{po}_Invoice.pdf", mime="application/pdf")
             if st.session_state.om_lab_url:
                 lab_bytes = download_and_rename(st.session_state.om_lab_url, po, "shipLabel")
-                if lab_bytes: c2.download_button(label="📥 Label", data=lab_bytes, file_name=f"{po}_shipLabel.pdf", mime="application/pdf")
+                if lab_bytes: c2.download_button(label="📥 Shipping Label", data=lab_bytes, file_name=f"{po}_shipLabel.pdf", mime="application/pdf")
         st.markdown('</div>', unsafe_allow_html=True)
         
     with om_t2:
@@ -369,7 +370,7 @@ with t5:
                 s, q = p.split(":")[0].strip(), int(p.split(":")[1].strip())
                 for _ in range(q): it.append({"itemCode": generate_item_code("RET-"), "reason": "damaged", "channelSkuCode": s})
             res = requests.post(URLS["RETURN_ORDER"], headers={'authUsername': CREDS["CREATE_RETURN"]["user"], 'authPassword': CREDS["CREATE_RETURN"]["pass"], 'Content-Type': 'application/json'}, json={"forwardOrderCode": fo, "returnOrderCode": f"r1-{fo}", "locationCode": "WHBGN21", "orderItems": it, "orderType": "CUSTOMER_RETURN", "awbNumber": ab, "transporter": "SELF", "dropAddress": {"name": "Naresh", "line1": "address"}, "pickupAddress": {"name": "Naresh", "line1": "address"}})
-            if res.status_code in [200, 201]: st.success("Created!")
+            if res.status_code in [200, 201]: st.success("Return Created!")
         st.markdown('</div>', unsafe_allow_html=True)
     with rt2:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
@@ -386,7 +387,7 @@ with t5:
         c3, c4 = st.columns(2); pa, ps = c3.text_input("Tracking Number", key="pab"), c4.text_input("SKU", key="psk")
         pq = st.selectbox("QC Status", ["PASS", "FAIL"], key="pqc")
         if st.button("Process Return"):
-            res = requests.post(URLS["PROCESS_RETURN"], headers={'authUsername': CREDS["PROCESS_RETURN"]["user"], 'authPassword': CREDS["PROCESS_RETURN"]["pass"], 'Content-Type': 'application/json'}, json={"returnOrderCode": pr, "forwardOrderCode": pf, "locationCode": "1992", "channelName": "NOON", "awbNumber": pa, "transporter": "SELF", "orderItems": [{"returnItemCode": generate_item_code("xyz"), "channelSkuCode": ps, "qcStatus": pq, "qcReason": "07"}]})
+            res = requests.post(URLS["PROCESS_RETURN"], headers={'authUsername': CREDS["PROCESS_RETURN"]["user"], 'authPassword': CREDS["PROCESS_RETURN"]["pass"], 'Content-Type': 'application/json'}, json={"returnOrderCode": pr, "forwardOrderCode": pf, "locationCode": "1992", "channelName": "NOON", "awbNumber": pa, "transporter": "SELF", "orderItems": [{"returnItemCode": generate_item_code("xyz"), "channelSkuCode": ps, "qcStatus": pq, "qcReason": "DAMAGED"}]})
             if res.status_code in [200, 201]: st.success("Return Processed Successfully!")
             else: st.error(res.text)
         st.markdown('</div>', unsafe_allow_html=True)
