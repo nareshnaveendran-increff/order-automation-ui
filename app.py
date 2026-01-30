@@ -31,6 +31,9 @@ def set_high_qual_logo(path, height="60px"):
         return f'<img src="data:image/png;base64,{bin_str}" style="height: {height}; width: auto; object-fit: contain;">'
     return ""
 
+def generate_random_id(length=10):
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
 def generate_item_code(prefix="xyz"):
     return prefix + ''.join(random.choices(string.digits, k=4))
 
@@ -291,7 +294,9 @@ with t2:
 
 # --- TAB 3: ORDER MANAGER ---
 with t3:
-    om_t1, om_t2, om_t3 = st.tabs(["📦 Pack Existing Order", "🔍 Search Specific Order", "🗓️ Last 7 Days Status"])
+    # ADDED SUB-TABS: "📦 Pack Existing Order", "📥 Bulk Order Creation", "🔍 Search Specific Order", "🗓️ Last 7 Days Status"
+    om_t1, om_bulk, om_t2, om_t3 = st.tabs(["📦 Pack Existing Order", "📥 Bulk Order Creation", "🔍 Search Specific Order", "🗓️ Last 7 Days Status"])
+    
     with om_t1:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         pc1, pc2, pc3 = st.columns(3)
@@ -312,6 +317,93 @@ with t3:
             if st.session_state.om_lab_url:
                 lab_bytes = download_and_rename(st.session_state.om_lab_url, po, "shipLabel")
                 if lab_bytes: c2.download_button(label="📥 Shipping Label", data=lab_bytes, file_name=f"{po}_shipLabel.pdf", mime="application/pdf")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # --- ADDED BULK CREATION LOGIC ---
+    with om_bulk:
+        st.markdown('<div class="step-card">', unsafe_allow_html=True)
+        st.subheader("🚀 High-Volume Bulk Order Automator")
+        
+        # UI Alignment
+        col_sku, col_count, col_dist = st.columns([2, 1, 1.5])
+        
+        with col_sku:
+            bulk_skus_input = st.text_area("SKU Entry (Comma separated)", placeholder="SKU1, SKU2, SKU3...", height=200, key="bulk_sku_list_neat")
+        
+        with col_count:
+            order_count_input = st.number_input("Orders to Create", 1, 1000, 10, key="bulk_ord_count_neat")
+            st.info("Limit: 1000 orders/execution")
+            
+        with col_dist:
+            st.markdown("##### Distribution Logic")
+            b_min_skus = st.number_input("Min SKUs/Order", 1, 20, 1)
+            b_max_skus = st.number_input("Max SKUs/Order", 1, 20, 2)
+            b_min_qty = st.number_input("Min Qty/SKU", 1, 100, 5)
+            b_max_qty = st.number_input("Max Qty/SKU", 1, 100, 5)
+
+        st.divider()
+        if st.button("🔥 Create Bulk Orders"):
+            sku_list = [s.strip() for s in bulk_skus_input.split(",") if s.strip()]
+            
+            if not sku_list:
+                st.error("Missing Data: Please enter at least one SKU.")
+            else:
+                headers = {'authUsername': CREDS["CREATE_ORDER"]["user"], 'authPassword': CREDS["CREATE_ORDER"]["pass"], 'Content-Type': 'application/json'}
+                summary_data = []
+                success_count = 0
+                
+                with st.status("Processing Order Pipeline...", expanded=True) as status:
+                    progress_bar = st.progress(0)
+                    for i in range(int(order_count_input)):
+                        order_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+                        now_dt = datetime.now()
+                        iso_now = now_dt.strftime("%Y-%m-%dT%H:%M:%S.000+05:30")
+                        iso_24h = (now_dt + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S.000+05:30")
+                        
+                        # Determine exact number of unique SKUs to pick based on available list
+                        desired_sku_count = random.randint(b_min_skus, b_max_skus)
+                        actual_sku_count = min(len(sku_list), desired_sku_count)
+                        picked_skus = random.sample(sku_list, actual_sku_count)
+                        
+                        items = []
+                        sku_qty_details = []
+                        for sku in picked_skus:
+                            qty = random.randint(b_min_qty, b_max_qty)
+                            items.append({
+                                "channelSkuCode": sku,
+                                "orderItemCode": sku,
+                                "quantity": qty,
+                                "sellerDiscountPerUnit": 10,
+                                "channelDiscountPerUnit": 10,
+                                "sellingPricePerUnit": 150,
+                                "shippingChargePerUnit": 20,
+                                "giftOptions": {"giftwrapRequired": False, "giftMessage": False, "giftChargePerUnit": None}
+                            })
+                            sku_qty_details.append(f"{sku}({qty})")
+                        
+                        payload = {
+                            "parentOrderCode": order_code, "locationCode": "WHBGN21", "orderCode": order_code, "orderTime": iso_now,
+                            "orderType": "SO", "isPriority": False, "gift": False, "onHold": False, "qcStatus": "PASS",
+                            "dispatchByTime": iso_24h, "startProcessingTime": iso_now, "paymentMethod": "COD", "isSplitRequired": "false",
+                            "packType": "PIECE",
+                            "shippingAddress": {"name": "Naresh", "line1": "Dubai Main Road", "line2": "Dubai Bus Stand", "line3": "", "city": "Dubai", "state": "", "zip": "000000", "country": "UAE", "email": "customer@gmail.com", "phone": "9999999999"},
+                            "billingAddress": {"name": "Naresh", "line1": "Dubai Main Road", "line2": "Dubai Bus Stand", "line3": "", "city": "Dubai", "state": "", "zip": "000000", "country": "UAE", "email": "customer@increff.com", "phone": "9999999999"},
+                            "orderItems": items
+                        }
+                        
+                        try:
+                            res = requests.post(URLS["CREATE"], headers=headers, json=payload)
+                            if res.status_code in [200, 201]:
+                                success_count += 1
+                                summary_data.append({"Order Code": order_code, "SKUs & Qty": ", ".join(sku_qty_details)})
+                        except: pass
+                        progress_bar.progress((i + 1) / order_count_input)
+                    
+                    status.update(label=f"Done! Created {success_count} orders.", state="complete")
+                
+                if summary_data:
+                    st.success("✅ Orders Generated Successfully")
+                    st.table(pd.DataFrame(summary_data))
         st.markdown('</div>', unsafe_allow_html=True)
         
     with om_t2:
