@@ -108,15 +108,15 @@ CREDS = {
     "UPDATE_INV": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"},
     "CREATE_ORDER": {"user": "NOON-1200063685", "pass": "73722c6c-c716-489c-88b8-5347132f5745"},
     "PACK_DISPATCH": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"},
-    "SUB_ORDER_SEARCH": {"user": "testing", "pass": "OqdR#Dv613", "domain": "staging1-omni", "client": "1200063685"},
+    "SUB_ORDER_SEARCH": {"user": "omni-system-user", "pass": "Nextscm@Syst*m1", "domain": "staging1-omni", "client": "1200063685"},
     "CANCEL_ORDER_CUST": {"user": "NOON-1200063685", "pass": "73722c6c-c716-489c-88b8-5347132f5745"},
     "CANCEL_ORDER_SELLER": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"},
     "CREATE_RETURN": {"user": "NOON-1200063685", "pass": "73722c6c-c716-489c-88b8-5347132f5745"},
-    "SEARCH_RETURN": {"user": "testing", "pass": "OqdR#Dv613", "domain": "staging1-omni", "client": "1200063685"},
-    "ORDER_STATUS_BULK": {"user": "testing", "pass": "OqdR#Dv613", "domain": "staging1-omni"},
+    "SEARCH_RETURN": {"user": "omni-system-user", "pass": "Nextscm@Syst*m1", "domain": "staging1-omni", "client": "1200063685"},
+    "ORDER_STATUS_BULK": {"user": "omni-system-user", "pass": "Nextscm@Syst*m1", "domain": "staging1-omni"},
     "PROCESS_RETURN": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"},
     "CREATE_ARTICLE": {"user": "LEVI_ERP-1200063685", "pass": "7e230f29-3c8d-4cea-9a17-f8a7dfe66caf"},
-    "CREATE_MP": {"user": "testing", "pass": "OqdR#Dv613", "domain": "staging1-omni"},
+    "CREATE_MP": {"user": "omni-system-user", "pass": "Nextscm@Syst*m1", "domain": "staging1-omni"},
     "CREATE_EFS": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"}
 }
 
@@ -503,3 +503,4 @@ with t6:
     else:
         st.warning("Please enter a keyword to generate the search link.")
     st.markdown('</div>', unsafe_allow_html=True)
+
