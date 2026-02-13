@@ -11,17 +11,23 @@ import urllib.parse
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-# Load environment variables from .env
+# 1. Load Environment Variables
 load_dotenv()
 
-# --- 1. Page Configuration ---
-st.set_page_config(
-    page_title="Increff USP Automation",
-    page_icon="🚚",
-    layout="wide"
-)
+# --- Page Configuration ---
+st.set_page_config(page_title="Increff USP Automation", page_icon="🚚", layout="wide")
 
-# --- 2. Helper Functions ---
+# --- DEBUG SIDEBAR (To check if Env is working) ---
+with st.sidebar:
+    st.header("⚙️ System Status")
+    env_check = os.getenv("SEARCH_INV_USER")
+    if env_check:
+        st.success("✅ .env Loaded Successfully")
+    else:
+        st.error("❌ .env NOT FOUND or EMPTY")
+        st.info("Ensure the .env file is in the same folder as app.py")
+
+# --- Helper Functions ---
 def get_base64_of_bin_file(bin_file):
     if os.path.exists(bin_file):
         with open(bin_file, 'rb') as f:
@@ -41,71 +47,7 @@ def generate_random_id(length=10):
 def generate_item_code(prefix="xyz"):
     return prefix + ''.join(random.choices(string.digits, k=4))
 
-def download_and_rename(url, order_id, suffix):
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.content
-        return None
-    except:
-        return None
-
-# --- 3. UI Styling & Animation ---
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-    [data-testid="stAppViewContainer"] { background-color: #fcfafb; font-family: 'Inter', sans-serif; }
-    .block-container { padding-top: 5rem !important; padding-bottom: 1rem !important; }
-    .header-wrapper { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 20px; }
-    .super-header { color: #d32f2f !important; font-size: 3rem !important; font-weight: 800 !important; letter-spacing: -1.8px; margin: 0; text-align: center; flex-grow: 1; }
-    .stock-card { background: #fff; border: 2px solid #d32f2f; border-radius: 10px; padding: 10px; text-align: center; box-shadow: 0 2px 8px rgba(211, 47, 47, 0.05); }
-    .stock-value { font-size: 2.8rem; color: #d32f2f; font-weight: 900; line-height: 1; margin: 5px 0; }
-    .step-card { background: #ffffff; padding: 25px; border-radius: 15px; border: 1px solid #eef0f2; box-shadow: 0 2px 10px rgba(0,0,0,0.03); margin-bottom: 15px; }
-    .stButton > button { background-color: #d32f2f !important; color: white !important; border-radius: 8px !important; font-weight: 700 !important; height: 3em !important; width: 100%; }
-    .elk-button {
-        display: block; padding: 15px; color: white !important; text-decoration: none;
-        background-color: #005a9e; border-radius: 8px; font-weight: 700; text-align: center; margin-top: 10px; font-size: 1.1rem;
-    }
-    .elk-button:hover { background-color: #004578; color: white !important; text-decoration: none; }
-    
-    @keyframes moveAcross {
-        0% { transform: translateX(-150%); }
-        100% { transform: translateX(2500%); }
-    }
-    .dispatch-anim {
-        position: fixed; top: 40%; left: 0; font-size: 85px; z-index: 9999;
-        animation: moveAcross 6s linear forwards;
-    }
-    .dispatch-text-bubble {
-        position: fixed; top: 55%; left: 50%; transform: translateX(-50%);
-        background: #d32f2f; color: white; padding: 18px 36px; border-radius: 40px;
-        font-weight: 800; font-size: 28px; z-index: 9999;
-        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-        animation: fadeInOut 6s forwards;
-    }
-    @keyframes fadeInOut {
-        0% { opacity: 0; }
-        15% { opacity: 1; }
-        85% { opacity: 1; }
-        100% { opacity: 0; }
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- 4. Header ---
-current_dir = os.path.dirname(__file__)
-path_increff = os.path.join(current_dir, "logo.png")
-path_levis = os.path.join(current_dir, "logo2.png")
-
-st.markdown(f"""
-    <div class="header-wrapper">
-        <div style="width: 150px; text-align: left;">{set_high_qual_logo(path_increff, "65px")}</div>
-        <h1 class="super-header">Increff USP Automation</h1>
-        <div style="width: 150px; text-align: left; padding-left: 20px;">{set_high_qual_logo(path_levis, "55px")}</div>
-    </div>
-""", unsafe_allow_html=True)
-
-# --- 5. Credentials (Mapped to .env) ---
+# --- Credentials Mapping ---
 CREDS = {
     "SEARCH_INV": {"user": os.getenv("SEARCH_INV_USER"), "pass": os.getenv("SEARCH_INV_PASS")},
     "UPDATE_INV": {"user": os.getenv("UPDATE_INV_USER"), "pass": os.getenv("UPDATE_INV_PASS")},
@@ -159,13 +101,17 @@ URLS = {
     "MASTER_EFS": "https://staging-common-assure.increff.com/assure-magic2/usp/listing/create"
 }
 
-# --- 6. Session State ---
+# --- Styling & Headers ---
+st.markdown("""<style>
+    .super-header { color: #d32f2f; font-size: 2.5rem; font-weight: 800; text-align: center; }
+    .step-card { background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd; margin-bottom: 10px; }
+    .stock-card { background: #fdf2f2; border: 1px solid #d32f2f; padding: 10px; border-radius: 8px; text-align: center; }
+    </style>""", unsafe_allow_html=True)
+
+st.markdown('<h1 class="super-header">Increff USP Automation</h1>', unsafe_allow_html=True)
+
+# --- Session State ---
 if 'inv_res' not in st.session_state: st.session_state.inv_res = []
-if 'order_id' not in st.session_state: st.session_state.order_id = ""
-if 'f_sku_map' not in st.session_state: st.session_state.f_sku_map = {}
-if 'om_inv_url' not in st.session_state: st.session_state.om_inv_url = None
-if 'om_lab_url' not in st.session_state: st.session_state.om_lab_url = None
-if 'show_truck' not in st.session_state: st.session_state.show_truck = False
 
 # --- 7. Main Tabs ---
 t0, t1, t2, t3, t4, t5, t6 = st.tabs([
@@ -292,10 +238,11 @@ with t2:
                 st.session_state.show_truck = True
                 st.rerun()
 
+        # Animation Trigger
         if st.session_state.show_truck:
             st.markdown('<div class="dispatch-text-bubble">Order Dispatched</div>', unsafe_allow_html=True)
             st.markdown('<div class="dispatch-anim">🚚💨</div>', unsafe_allow_html=True)
-            time.sleep(6)
+            time.sleep(6) # Wait for truck to finish crossing
             st.session_state.show_truck = False
             st.rerun()
 
@@ -314,6 +261,7 @@ with t2:
 
 # --- TAB 3: ORDER MANAGER ---
 with t3:
+    # ADDED SUB-TABS: "📦 Pack Existing Order", "📥 Bulk Order Creation", "🔍 Search Specific Order", "🗓️ Last 7 Days Status"
     om_t1, om_bulk, om_t2, om_t3 = st.tabs(["📦 Pack Existing Order", "📥 Bulk Order Creation", "🔍 Search Specific Order", "🗓️ Last 7 Days Status"])
     
     with om_t1:
@@ -338,34 +286,91 @@ with t3:
                 if lab_bytes: c2.download_button(label="📥 Shipping Label", data=lab_bytes, file_name=f"{po}_shipLabel.pdf", mime="application/pdf")
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # --- ADDED BULK CREATION LOGIC ---
     with om_bulk:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         st.subheader("🚀 High-Volume Bulk Order Automator")
+        
+        # UI Alignment
         col_sku, col_count, col_dist = st.columns([2, 1, 1.5])
-        with col_sku: bulk_skus_input = st.text_area("SKU Entry", height=200, key="bulk_sku_list_neat")
-        with col_count: order_count_input = st.number_input("Orders to Create", 1, 1000, 10, key="bulk_ord_count_neat")
+        
+        with col_sku:
+            bulk_skus_input = st.text_area("SKU Entry (Comma separated)", placeholder="SKU1, SKU2, SKU3...", height=200, key="bulk_sku_list_neat")
+        
+        with col_count:
+            order_count_input = st.number_input("Orders to Create", 1, 1000, 10, key="bulk_ord_count_neat")
+            st.info("Limit: 1000 orders/execution")
+            
         with col_dist:
-            b_min_skus, b_max_skus = st.number_input("Min SKUs", 1, 20, 1), st.number_input("Max SKUs", 1, 20, 2)
-            b_min_qty, b_max_qty = st.number_input("Min Qty", 1, 100, 5), st.number_input("Max Qty", 1, 100, 5)
+            st.markdown("##### Distribution Logic")
+            b_min_skus = st.number_input("Min SKUs/Order", 1, 20, 1)
+            b_max_skus = st.number_input("Max SKUs/Order", 1, 20, 2)
+            b_min_qty = st.number_input("Min Qty/SKU", 1, 100, 5)
+            b_max_qty = st.number_input("Max Qty/SKU", 1, 100, 5)
+
         st.divider()
         if st.button("🔥 Create Bulk Orders"):
             sku_list = [s.strip() for s in bulk_skus_input.split(",") if s.strip()]
-            if sku_list:
+            
+            if not sku_list:
+                st.error("Missing Data: Please enter at least one SKU.")
+            else:
                 headers = {'authUsername': CREDS["CREATE_ORDER"]["user"], 'authPassword': CREDS["CREATE_ORDER"]["pass"], 'Content-Type': 'application/json'}
                 summary_data = []
-                with st.status("Processing...") as status:
-                    p = st.progress(0)
+                success_count = 0
+                
+                with st.status("Processing Order Pipeline...", expanded=True) as status:
+                    progress_bar = st.progress(0)
                     for i in range(int(order_count_input)):
-                        order_code = generate_random_id()
-                        now_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000+05:30")
-                        picked = random.sample(sku_list, min(len(sku_list), random.randint(b_min_skus, b_max_skus)))
-                        items = [{"channelSkuCode": s, "orderItemCode": s, "quantity": random.randint(b_min_qty, b_max_qty), "sellerDiscountPerUnit": 10, "channelDiscountPerUnit": 10, "sellingPricePerUnit": 150, "shippingChargePerUnit": 20} for s in picked]
-                        payload = {"parentOrderCode": order_code, "locationCode": "WHBGN21", "orderCode": order_code, "orderTime": now_iso, "orderType": "SO", "orderItems": items, "paymentMethod": "COD", "shippingAddress": {"name": "Naresh", "line1": "Dubai", "city": "Dubai", "zip": "000000", "country": "UAE", "phone": "9999999999"}, "billingAddress": {"name": "Naresh", "line1": "Dubai", "city": "Dubai", "zip": "000000", "country": "UAE", "phone": "9999999999"}}
-                        requests.post(URLS["CREATE"], headers=headers, json=payload)
-                        summary_data.append({"Order Code": order_code, "Items": len(items)})
-                        p.progress((i + 1) / order_count_input)
-                    status.update(label="Complete!", state="complete")
-                st.table(pd.DataFrame(summary_data))
+                        order_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+                        now_dt = datetime.now()
+                        iso_now = now_dt.strftime("%Y-%m-%dT%H:%M:%S.000+05:30")
+                        iso_24h = (now_dt + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S.000+05:30")
+                        
+                        # Determine exact number of unique SKUs to pick based on available list
+                        desired_sku_count = random.randint(b_min_skus, b_max_skus)
+                        actual_sku_count = min(len(sku_list), desired_sku_count)
+                        picked_skus = random.sample(sku_list, actual_sku_count)
+                        
+                        items = []
+                        sku_qty_details = []
+                        for sku in picked_skus:
+                            qty = random.randint(b_min_qty, b_max_qty)
+                            items.append({
+                                "channelSkuCode": sku,
+                                "orderItemCode": sku,
+                                "quantity": qty,
+                                "sellerDiscountPerUnit": 10,
+                                "channelDiscountPerUnit": 10,
+                                "sellingPricePerUnit": 150,
+                                "shippingChargePerUnit": 20,
+                                "giftOptions": {"giftwrapRequired": False, "giftMessage": False, "giftChargePerUnit": None}
+                            })
+                            sku_qty_details.append(f"{sku}({qty})")
+                        
+                        payload = {
+                            "parentOrderCode": order_code, "locationCode": "WHBGN21", "orderCode": order_code, "orderTime": iso_now,
+                            "orderType": "SO", "isPriority": False, "gift": False, "onHold": False, "qcStatus": "PASS",
+                            "dispatchByTime": iso_24h, "startProcessingTime": iso_now, "paymentMethod": "COD", "isSplitRequired": "false",
+                            "packType": "PIECE",
+                            "shippingAddress": {"name": "Naresh", "line1": "Dubai Main Road", "line2": "Dubai Bus Stand", "line3": "", "city": "Dubai", "state": "", "zip": "000000", "country": "UAE", "email": "customer@gmail.com", "phone": "9999999999"},
+                            "billingAddress": {"name": "Naresh", "line1": "Dubai Main Road", "line2": "Dubai Bus Stand", "line3": "", "city": "Dubai", "state": "", "zip": "000000", "country": "UAE", "email": "customer@increff.com", "phone": "9999999999"},
+                            "orderItems": items
+                        }
+                        
+                        try:
+                            res = requests.post(URLS["CREATE"], headers=headers, json=payload)
+                            if res.status_code in [200, 201]:
+                                success_count += 1
+                                summary_data.append({"Order Code": order_code, "SKUs & Qty": ", ".join(sku_qty_details)})
+                        except: pass
+                        progress_bar.progress((i + 1) / order_count_input)
+                    
+                    status.update(label=f"Done! Created {success_count} orders.", state="complete")
+                
+                if summary_data:
+                    st.success("✅ Orders Generated Successfully")
+                    st.table(pd.DataFrame(summary_data))
         st.markdown('</div>', unsafe_allow_html=True)
         
     with om_t2:
@@ -377,7 +382,6 @@ with t3:
                 data = res.json(); orders = data if isinstance(data, list) else next((v for v in data.values() if isinstance(v, list)), [])
                 st.table(pd.DataFrame([{"channelOrderId": o.get("channelOrderId"), "channelId": o.get("channelId") or o.get("channelName"), "status": o.get("status")} for o in orders]))
         st.markdown('</div>', unsafe_allow_html=True)
-
     with om_t3:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         if st.button("Fetch 7-Day Orders"):
@@ -388,7 +392,10 @@ with t3:
                 if ol:
                     df = pd.DataFrame([{"channelOrderId": o.get("channelOrderId"), "channelId": o.get("channelName") or o.get("channelId"), "status": o.get("status")} for o in ol])
                     st.table(df)
+                    st.divider()
+                    st.subheader("📊 Status Breakdown")
                     st.bar_chart(df['status'].value_counts())
+                else: st.warning("No orders found for the last 7 days.")
         st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 4: ORDER CANCELLATION ---
@@ -441,15 +448,25 @@ with t5:
         if st.button("Process Return"):
             res = requests.post(URLS["PROCESS_RETURN"], headers={'authUsername': CREDS["PROCESS_RETURN"]["user"], 'authPassword': CREDS["PROCESS_RETURN"]["pass"], 'Content-Type': 'application/json'}, json={"returnOrderCode": pr, "forwardOrderCode": pf, "locationCode": "1992", "channelName": "NOON", "awbNumber": pa, "transporter": "SELF", "orderItems": [{"returnItemCode": generate_item_code("xyz"), "channelSkuCode": ps, "qcStatus": pq, "qcReason": "DAMAGED"}]})
             if res.status_code in [200, 201]: st.success("Return Processed Successfully!")
+            else: st.error(res.text)
         st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 6: LOGS ---
 with t6:
     st.markdown('<div class="step-card">', unsafe_allow_html=True)
-    st.subheader("📋 ELK Logs Search")
-    lk = st.text_input("Keyword", key="lk_main")
+    st.subheader("📋 ELK Logs Search (Last 30 Mins)")
+    l1, l2, l3 = st.columns(3)
+    lk = l1.text_input("Keyword", key="lk_main")
+    lr = l2.text_input("Request Name (Optional)", key="lk_req")
+    ls = l3.text_input("Status (Optional)", key="lk_stat")
+    st.info("**Instructions:** Use `admin` / `admin` to login.")
     if lk:
-        query_encoded = urllib.parse.quote(f'"{lk}"')
+        lucene_query = f'"{lk}"'
+        if lr: lucene_query += f' AND request_name: *{lr}*'
+        if ls: lucene_query += f' AND status: *{ls}*'
+        query_encoded = urllib.parse.quote(lucene_query)
         elk_url = f"https://elk-dev.nextscm.com/app/kibana#/discover?_g=(time:(from:now-30m,to:now))&_a=(query:(language:lucene,query:'{query_encoded}'))"
-        st.markdown(f'<a href="{elk_url}" target="_blank" class="elk-button">🔍 Open ELK Search</a>', unsafe_allow_html=True)
+        st.markdown(f'<div style="margin-top: 20px;"><p>Query: <code>{lucene_query}</code></p><a href="{elk_url}" target="_blank" class="elk-button">🔍 Open ELK Search</a></div>', unsafe_allow_html=True)
+    else:
+        st.warning("Please enter a keyword to generate the search link.")
     st.markdown('</div>', unsafe_allow_html=True)
