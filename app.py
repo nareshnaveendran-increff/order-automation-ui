@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 # 1. Load Environment Variables
-load_dotenv()
+load_dotenv("cred.env")
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Increff USP Automation", page_icon="🚚", layout="wide")
@@ -470,3 +470,4 @@ with t6:
     else:
         st.warning("Please enter a keyword to generate the search link.")
     st.markdown('</div>', unsafe_allow_html=True)
+
