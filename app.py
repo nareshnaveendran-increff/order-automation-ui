@@ -11,23 +11,25 @@ import urllib.parse
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-# 1. Load Environment Variables
+# --- 1. Load Environment Variables ---
 load_dotenv("cred.env")
 
-# --- Page Configuration ---
-st.set_page_config(page_title="Increff USP Automation", page_icon="🚚", layout="wide")
+# --- 2. Page Configuration ---
+st.set_page_config(
+    page_title="Increff USP Automation",
+    page_icon="🚚",
+    layout="wide"
+)
 
-# --- DEBUG SIDEBAR (To check if Env is working) ---
-with st.sidebar:
-    st.header("⚙️ System Status")
-    env_check = os.getenv("SEARCH_INV_USER")
-    if env_check:
-        st.success("✅ .env Loaded Successfully")
-    else:
-        st.error("❌ .env NOT FOUND or EMPTY")
-        st.info("Ensure the .env file is in the same folder as app.py")
+# --- 3. Session State Initialization (Prevents AttributeError) ---
+if 'inv_res' not in st.session_state: st.session_state.inv_res = []
+if 'order_id' not in st.session_state: st.session_state.order_id = ""
+if 'f_sku_map' not in st.session_state: st.session_state.f_sku_map = {}
+if 'om_inv_url' not in st.session_state: st.session_state.om_inv_url = None
+if 'om_lab_url' not in st.session_state: st.session_state.om_lab_url = None
+if 'show_truck' not in st.session_state: st.session_state.show_truck = False
 
-# --- Helper Functions ---
+# --- 4. Helper Functions ---
 def get_base64_of_bin_file(bin_file):
     if os.path.exists(bin_file):
         with open(bin_file, 'rb') as f:
@@ -47,39 +49,28 @@ def generate_random_id(length=10):
 def generate_item_code(prefix="xyz"):
     return prefix + ''.join(random.choices(string.digits, k=4))
 
-# --- Credentials Mapping ---
+def download_and_rename(url, order_id, suffix):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200: return response.content
+        return None
+    except: return None
+
+# --- 5. Credentials & URLs ---
 CREDS = {
     "SEARCH_INV": {"user": os.getenv("SEARCH_INV_USER"), "pass": os.getenv("SEARCH_INV_PASS")},
     "UPDATE_INV": {"user": os.getenv("UPDATE_INV_USER"), "pass": os.getenv("UPDATE_INV_PASS")},
     "CREATE_ORDER": {"user": os.getenv("CREATE_ORDER_USER"), "pass": os.getenv("CREATE_ORDER_PASS")},
     "PACK_DISPATCH": {"user": os.getenv("PACK_DISPATCH_USER"), "pass": os.getenv("PACK_DISPATCH_PASS")},
-    "SUB_ORDER_SEARCH": {
-        "user": os.getenv("OMNI_USER"), 
-        "pass": os.getenv("OMNI_PASS"), 
-        "domain": os.getenv("OMNI_DOMAIN"), 
-        "client": os.getenv("OMNI_CLIENT")
-    },
+    "SUB_ORDER_SEARCH": {"user": os.getenv("OMNI_USER"), "pass": os.getenv("OMNI_PASS"), "domain": os.getenv("OMNI_DOMAIN"), "client": os.getenv("OMNI_CLIENT")},
     "CANCEL_ORDER_CUST": {"user": os.getenv("CREATE_ORDER_USER"), "pass": os.getenv("CREATE_ORDER_PASS")},
     "CANCEL_ORDER_SELLER": {"user": os.getenv("PACK_DISPATCH_USER"), "pass": os.getenv("PACK_DISPATCH_PASS")},
     "CREATE_RETURN": {"user": os.getenv("CREATE_ORDER_USER"), "pass": os.getenv("CREATE_ORDER_PASS")},
-    "SEARCH_RETURN": {
-        "user": os.getenv("OMNI_USER"), 
-        "pass": os.getenv("OMNI_PASS"), 
-        "domain": os.getenv("OMNI_DOMAIN"), 
-        "client": os.getenv("OMNI_CLIENT")
-    },
-    "ORDER_STATUS_BULK": {
-        "user": os.getenv("OMNI_USER"), 
-        "pass": os.getenv("OMNI_PASS"), 
-        "domain": os.getenv("OMNI_DOMAIN")
-    },
+    "SEARCH_RETURN": {"user": os.getenv("OMNI_USER"), "pass": os.getenv("OMNI_PASS"), "domain": os.getenv("OMNI_DOMAIN"), "client": os.getenv("OMNI_CLIENT")},
+    "ORDER_STATUS_BULK": {"user": os.getenv("OMNI_USER"), "pass": os.getenv("OMNI_PASS"), "domain": os.getenv("OMNI_DOMAIN")},
     "PROCESS_RETURN": {"user": os.getenv("PACK_DISPATCH_USER"), "pass": os.getenv("PACK_DISPATCH_PASS")},
     "CREATE_ARTICLE": {"user": os.getenv("CREATE_ARTICLE_USER"), "pass": os.getenv("CREATE_ARTICLE_PASS")},
-    "CREATE_MP": {
-        "user": os.getenv("OMNI_USER"), 
-        "pass": os.getenv("OMNI_PASS"), 
-        "domain": os.getenv("OMNI_DOMAIN")
-    },
+    "CREATE_MP": {"user": os.getenv("OMNI_USER"), "pass": os.getenv("OMNI_PASS"), "domain": os.getenv("OMNI_DOMAIN")},
     "CREATE_EFS": {"user": os.getenv("PACK_DISPATCH_USER"), "pass": os.getenv("PACK_DISPATCH_PASS")}
 }
 
@@ -470,4 +461,5 @@ with t6:
     else:
         st.warning("Please enter a keyword to generate the search link.")
     st.markdown('</div>', unsafe_allow_html=True)
+
 
