@@ -9,10 +9,6 @@ import random
 import string
 import urllib.parse
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
-
-# --- Load Environment Variables ---
-load_dotenv()
 
 # --- 1. Page Configuration ---
 st.set_page_config(
@@ -106,22 +102,22 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- 5. Credentials & URLs (Env Mapped) ---
+# --- 5. Credentials & URLs ---
 CREDS = {
-    "SEARCH_INV": {"user": os.getenv("SEARCH_INV_USER"), "pass": os.getenv("SEARCH_INV_PASS")},
-    "UPDATE_INV": {"user": os.getenv("UPDATE_INV_USER"), "pass": os.getenv("UPDATE_INV_PASS")},
-    "CREATE_ORDER": {"user": os.getenv("CREATE_ORDER_USER"), "pass": os.getenv("CREATE_ORDER_PASS")},
-    "PACK_DISPATCH": {"user": os.getenv("PACK_DISPATCH_USER"), "pass": os.getenv("PACK_DISPATCH_PASS")},
-    "SUB_ORDER_SEARCH": {"user": os.getenv("OMNI_USER"), "pass": os.getenv("OMNI_PASS"), "domain": os.getenv("OMNI_DOMAIN"), "client": os.getenv("OMNI_CLIENT")},
-    "CANCEL_ORDER_CUST": {"user": os.getenv("CREATE_ORDER_USER"), "pass": os.getenv("CREATE_ORDER_PASS")},
-    "CANCEL_ORDER_SELLER": {"user": os.getenv("PACK_DISPATCH_USER"), "pass": os.getenv("PACK_DISPATCH_PASS")},
-    "CREATE_RETURN": {"user": os.getenv("CREATE_ORDER_USER"), "pass": os.getenv("CREATE_ORDER_PASS")},
-    "SEARCH_RETURN": {"user": os.getenv("OMNI_USER"), "pass": os.getenv("OMNI_PASS"), "domain": os.getenv("OMNI_DOMAIN"), "client": os.getenv("OMNI_CLIENT")},
-    "ORDER_STATUS_BULK": {"user": os.getenv("OMNI_USER"), "pass": os.getenv("OMNI_PASS"), "domain": os.getenv("OMNI_DOMAIN")},
-    "PROCESS_RETURN": {"user": os.getenv("PACK_DISPATCH_USER"), "pass": os.getenv("PACK_DISPATCH_PASS")},
-    "CREATE_ARTICLE": {"user": os.getenv("CREATE_ARTICLE_USER"), "pass": os.getenv("CREATE_ARTICLE_PASS")},
-    "CREATE_MP": {"user": os.getenv("OMNI_USER"), "pass": os.getenv("OMNI_PASS"), "domain": os.getenv("OMNI_DOMAIN")},
-    "CREATE_EFS": {"user": os.getenv("PACK_DISPATCH_USER"), "pass": os.getenv("PACK_DISPATCH_PASS")}
+    "SEARCH_INV": {"user": "NOON-1200063685", "pass": "73722c6c-c716-489c-88b8-5347132f5745"},
+    "UPDATE_INV": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"},
+    "CREATE_ORDER": {"user": "NOON-1200063685", "pass": "73722c6c-c716-489c-88b8-5347132f5745"},
+    "PACK_DISPATCH": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"},
+    "SUB_ORDER_SEARCH": {"user": "omni-system-user", "pass": "Nextscm@Syst*m1", "domain": "staging1-omni", "client": "1200063685"},
+    "CANCEL_ORDER_CUST": {"user": "NOON-1200063685", "pass": "73722c6c-c716-489c-88b8-5347132f5745"},
+    "CANCEL_ORDER_SELLER": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"},
+    "CREATE_RETURN": {"user": "NOON-1200063685", "pass": "73722c6c-c716-489c-88b8-5347132f5745"},
+    "SEARCH_RETURN": {"user": "omni-system-user", "pass": "Nextscm@Syst*m1", "domain": "staging1-omni", "client": "1200063685"},
+    "ORDER_STATUS_BULK": {"user": "omni-system-user", "pass": "Nextscm@Syst*m1", "domain": "staging1-omni"},
+    "PROCESS_RETURN": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"},
+    "CREATE_ARTICLE": {"user": "LEVI_ERP-1200063685", "pass": "7e230f29-3c8d-4cea-9a17-f8a7dfe66caf"},
+    "CREATE_MP": {"user": "omni-system-user", "pass": "Nextscm@Syst*m1", "domain": "staging1-omni"},
+    "CREATE_EFS": {"user": "LEVI_EFS-1200063685", "pass": "d958a6d2-e6f5-4c89-86f7-26d21654f878"}
 }
 
 URLS = {
@@ -158,7 +154,7 @@ t0, t1, t2, t3, t4, t5, t6 = st.tabs([
 
 # --- TAB 0: MASTER ---
 with t0:
-    m_tabs = st.tabs(["➕ Create Article", "🛍️ Create MP Listing", "📦 Create EFS Listing"])
+    m_tabs = st.tabs(["➕ Create Articles", "🛍️ Create MP Listing", "📦 Create EFS Listing"])
     with m_tabs[0]:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         st.subheader("Create New Article Master")
@@ -298,6 +294,7 @@ with t2:
 
 # --- TAB 3: ORDER MANAGER ---
 with t3:
+    # ADDED SUB-TABS: "📦 Pack Existing Order", "📥 Bulk Order Creation", "🔍 Search Specific Order", "🗓️ Last 7 Days Status"
     om_t1, om_bulk, om_t2, om_t3 = st.tabs(["📦 Pack Existing Order", "📥 Bulk Order Creation", "🔍 Search Specific Order", "🗓️ Last 7 Days Status"])
     
     with om_t1:
@@ -322,30 +319,39 @@ with t3:
                 if lab_bytes: c2.download_button(label="📥 Shipping Label", data=lab_bytes, file_name=f"{po}_shipLabel.pdf", mime="application/pdf")
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # --- ADDED BULK CREATION LOGIC ---
     with om_bulk:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         st.subheader("🚀 High-Volume Bulk Order Automator")
+        
+        # UI Alignment
         col_sku, col_count, col_dist = st.columns([2, 1, 1.5])
+        
         with col_sku:
             bulk_skus_input = st.text_area("SKU Entry (Comma separated)", placeholder="SKU1, SKU2, SKU3...", height=200, key="bulk_sku_list_neat")
+        
         with col_count:
             order_count_input = st.number_input("Orders to Create", 1, 1000, 10, key="bulk_ord_count_neat")
             st.info("Limit: 1000 orders/execution")
+            
         with col_dist:
             st.markdown("##### Distribution Logic")
             b_min_skus = st.number_input("Min SKUs/Order", 1, 20, 1)
             b_max_skus = st.number_input("Max SKUs/Order", 1, 20, 2)
             b_min_qty = st.number_input("Min Qty/SKU", 1, 100, 5)
             b_max_qty = st.number_input("Max Qty/SKU", 1, 100, 5)
+
         st.divider()
         if st.button("🔥 Create Bulk Orders"):
             sku_list = [s.strip() for s in bulk_skus_input.split(",") if s.strip()]
+            
             if not sku_list:
                 st.error("Missing Data: Please enter at least one SKU.")
             else:
                 headers = {'authUsername': CREDS["CREATE_ORDER"]["user"], 'authPassword': CREDS["CREATE_ORDER"]["pass"], 'Content-Type': 'application/json'}
                 summary_data = []
                 success_count = 0
+                
                 with st.status("Processing Order Pipeline...", expanded=True) as status:
                     progress_bar = st.progress(0)
                     for i in range(int(order_count_input)):
@@ -353,16 +359,38 @@ with t3:
                         now_dt = datetime.now()
                         iso_now = now_dt.strftime("%Y-%m-%dT%H:%M:%S.000+05:30")
                         iso_24h = (now_dt + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S.000+05:30")
+                        
+                        # Determine exact number of unique SKUs to pick based on available list
                         desired_sku_count = random.randint(b_min_skus, b_max_skus)
                         actual_sku_count = min(len(sku_list), desired_sku_count)
                         picked_skus = random.sample(sku_list, actual_sku_count)
+                        
                         items = []
                         sku_qty_details = []
                         for sku in picked_skus:
                             qty = random.randint(b_min_qty, b_max_qty)
-                            items.append({"channelSkuCode": sku, "orderItemCode": sku, "quantity": qty, "sellerDiscountPerUnit": 10, "channelDiscountPerUnit": 10, "sellingPricePerUnit": 150, "shippingChargePerUnit": 20, "giftOptions": {"giftwrapRequired": False, "giftMessage": False, "giftChargePerUnit": None}})
+                            items.append({
+                                "channelSkuCode": sku,
+                                "orderItemCode": sku,
+                                "quantity": qty,
+                                "sellerDiscountPerUnit": 10,
+                                "channelDiscountPerUnit": 10,
+                                "sellingPricePerUnit": 150,
+                                "shippingChargePerUnit": 20,
+                                "giftOptions": {"giftwrapRequired": False, "giftMessage": False, "giftChargePerUnit": None}
+                            })
                             sku_qty_details.append(f"{sku}({qty})")
-                        payload = {"parentOrderCode": order_code, "locationCode": "WHBGN21", "orderCode": order_code, "orderTime": iso_now, "orderType": "SO", "isPriority": False, "gift": False, "onHold": False, "qcStatus": "PASS", "dispatchByTime": iso_24h, "startProcessingTime": iso_now, "paymentMethod": "COD", "isSplitRequired": "false", "packType": "PIECE", "shippingAddress": {"name": "Naresh", "line1": "Dubai Main Road", "line2": "Dubai Bus Stand", "line3": "", "city": "Dubai", "state": "", "zip": "000000", "country": "UAE", "email": "customer@gmail.com", "phone": "9999999999"}, "billingAddress": {"name": "Naresh", "line1": "Dubai Main Road", "line2": "Dubai Bus Stand", "line3": "", "city": "Dubai", "state": "", "zip": "000000", "country": "UAE", "email": "customer@increff.com", "phone": "9999999999"}, "orderItems": items}
+                        
+                        payload = {
+                            "parentOrderCode": order_code, "locationCode": "WHBGN21", "orderCode": order_code, "orderTime": iso_now,
+                            "orderType": "SO", "isPriority": False, "gift": False, "onHold": False, "qcStatus": "PASS",
+                            "dispatchByTime": iso_24h, "startProcessingTime": iso_now, "paymentMethod": "COD", "isSplitRequired": "false",
+                            "packType": "PIECE",
+                            "shippingAddress": {"name": "Naresh", "line1": "Dubai Main Road", "line2": "Dubai Bus Stand", "line3": "", "city": "Dubai", "state": "", "zip": "000000", "country": "UAE", "email": "customer@gmail.com", "phone": "9999999999"},
+                            "billingAddress": {"name": "Naresh", "line1": "Dubai Main Road", "line2": "Dubai Bus Stand", "line3": "", "city": "Dubai", "state": "", "zip": "000000", "country": "UAE", "email": "customer@increff.com", "phone": "9999999999"},
+                            "orderItems": items
+                        }
+                        
                         try:
                             res = requests.post(URLS["CREATE"], headers=headers, json=payload)
                             if res.status_code in [200, 201]:
@@ -370,12 +398,14 @@ with t3:
                                 summary_data.append({"Order Code": order_code, "SKUs & Qty": ", ".join(sku_qty_details)})
                         except: pass
                         progress_bar.progress((i + 1) / order_count_input)
+                    
                     status.update(label=f"Done! Created {success_count} orders.", state="complete")
+                
                 if summary_data:
                     st.success("✅ Orders Generated Successfully")
                     st.table(pd.DataFrame(summary_data))
         st.markdown('</div>', unsafe_allow_html=True)
-
+        
     with om_t2:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         ci = st.text_input("Channel Order ID", key="omsi")
@@ -385,7 +415,6 @@ with t3:
                 data = res.json(); orders = data if isinstance(data, list) else next((v for v in data.values() if isinstance(v, list)), [])
                 st.table(pd.DataFrame([{"channelOrderId": o.get("channelOrderId"), "channelId": o.get("channelId") or o.get("channelName"), "status": o.get("status")} for o in orders]))
         st.markdown('</div>', unsafe_allow_html=True)
-        
     with om_t3:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         if st.button("Fetch 7-Day Orders"):
