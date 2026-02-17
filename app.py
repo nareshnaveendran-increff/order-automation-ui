@@ -50,6 +50,13 @@ def download_and_rename(url, order_id, suffix):
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+    /*Force Global Visibility Fix */
+    [data-testid="stAppViewContainer"], .stMarkdown, p, span, label { color: #1a1a1a !important; }
+    h1, h2, h3, h4, h5, h6 { color: #333333 !important; }
+    input, textarea, [data-baseweb="select"] { color: #1a1a1a !important; }
+    .stTable td, .stTable th { color: #1a1a1a !important; }
+
     [data-testid="stAppViewContainer"] { background-color: #fcfafb; font-family: 'Inter', sans-serif; }
     .block-container { padding-top: 5rem !important; padding-bottom: 1rem !important; }
     .header-wrapper { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 20px; }
