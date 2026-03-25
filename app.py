@@ -161,7 +161,7 @@ t0, t1, t2, t3, t4, t5, t6 = st.tabs([
 
 # --- TAB 0: MASTER ---
 with t0:
-    m_tabs = st.tabs(["➕ Create Articles", "🛍️ Create MP Listing", "📦 Create EFS Listing"])
+    m_tabs = st.tabs(["➕ Create Articles", "🛍️ Create MarketPlace Listing", "📦 Create EFS Listing"])
     with m_tabs[0]:
         st.markdown('<div class="step-card">', unsafe_allow_html=True)
         st.subheader("Create New Article Master")
