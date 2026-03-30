@@ -2,3 +2,4 @@ streamlit
 requests
 pandas
 python-dotenv
+streamlit-authenticator==0.3.2
