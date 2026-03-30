@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit_authenticator as stauth
 import requests
 import json
 import time
@@ -8,7 +9,80 @@ import pandas as pd
 import random
 import string
 import urllib.parse
+import yaml
 from datetime import datetime, timedelta
+from yaml.loader import SafeLoader
+
+# --- 1. AUTHENTICATION CONFIGURATION ---
+# In production, move these to .streamlit/secrets.toml
+credentials = {
+    "usernames": {
+        "admin": {
+            "name": "Admin User",
+            "password": "REPLACE_WITH_HASH_FROM_STEP_BELOW" 
+        },
+        "ops_team": {
+            "name": "Operations Team",
+            "password": "REPLACE_WITH_HASH_FROM_STEP_BELOW"
+        }
+    }
+}
+
+authenticator = stauth.Authenticate(
+    credentials,
+    "increff_automation_cookie",
+    "signature_key_12345",
+    cookie_expiry_days=30
+)
+
+# --- 2. RENDER LOGIN INTERFACE ---
+name, authentication_status, username = authenticator.login('Login', 'main')
+
+if authentication_status == False:
+    st.error('Username/password is incorrect')
+elif authentication_status == None:
+    st.warning('Please enter your company credentials to access the USP Automation tool.')
+elif authentication_status:
+
+    # --- 3. Sidebar Logout & User Info ---
+    with st.sidebar:
+        st.markdown(f"### Welcome, {name}!")
+        authenticator.logout('Logout', 'sidebar')
+        st.divider()
+        st.info("Authorized access only. All actions are logged.")
+
+    # --- 4. Page Configuration (Moved inside Auth) ---
+    # Note: set_page_config must be the first streamlit command run, 
+    # but since login happens first, we keep it here or at the very top.
+    
+    # --- 5. Helper Functions ---
+    def get_base64_of_bin_file(bin_file):
+        if os.path.exists(bin_file):
+            with open(bin_file, 'rb') as f:
+                data = f.read()
+            return base64.b64encode(data).decode()
+        return None
+
+    def set_high_qual_logo(path, height="60px"):
+        bin_str = get_base64_of_bin_file(path)
+        if bin_str:
+            return f'<img src="data:image/png;base64,{bin_str}" style="height: {height}; width: auto; object-fit: contain;">'
+        return ""
+
+    def generate_random_id(length=10):
+        return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
+    def generate_item_code(prefix="xyz"):
+        return prefix + ''.join(random.choices(string.digits, k=4))
+
+    def download_and_rename(url, order_id, suffix):
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                return response.content
+            return None
+        except:
+            return None
 
 # --- 1. Page Configuration ---
 st.set_page_config(
